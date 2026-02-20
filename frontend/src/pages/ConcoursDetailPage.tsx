@@ -12,8 +12,6 @@ import {
   CheckCircle,
   Tv,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { concoursApi } from '@/api/concours';
 import { partiesApi } from '@/api/parties';
@@ -123,6 +121,14 @@ export default function ConcoursDetailPage(): JSX.Element {
   }, [parties]);
 
   const nbToursConfig = concours?.params?.nbTours ?? 0;
+  
+  // Generate all configured tours (1 to nbToursConfig), or only existing tours if nbTours not set
+  const allTours = useMemo(() => {
+    if (nbToursConfig > 0) {
+      return Array.from({ length: nbToursConfig }, (_, i) => i + 1);
+    }
+    return tours;
+  }, [nbToursConfig, tours]);
   const maxTour = Math.max(...(tours.length ? tours : [0]), tourActif);
   const nextTour = maxTour + 1;
   const allCurrentDone =
@@ -251,53 +257,42 @@ export default function ConcoursDetailPage(): JSX.Element {
             </div>
           ) : (
             <>
-              {tours.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setTourActif((t) => Math.max(1, t - 1))}
-                    disabled={tourActif <= 1}
-                    className="p-1.5 rounded-lg text-dark-50 hover:text-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
-                  <div className="flex gap-1.5">
-                    {tours.map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => setTourActif(t)}
-                        className={cn(
-                          'w-8 h-8 rounded-lg text-sm font-medium transition-colors',
-                          tourActif === t
-                            ? 'bg-primary-500 text-white'
-                            : 'bg-dark-400 text-dark-50 hover:text-gray-100',
-                        )}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                    {canLancerNext && (
-                      <button
-                        onClick={() => setTourActif(nextTour)}
-                        className={cn(
-                          'w-8 h-8 rounded-lg text-sm font-medium transition-colors border border-dashed',
-                          tourActif === nextTour
-                            ? 'border-primary-500 text-primary-500 bg-primary-500/10'
-                            : 'border-dark-300 text-dark-100 hover:text-dark-50',
-                        )}
-                      >
-                        {nextTour}
-                      </button>
-                    )}
+              {allTours.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                  <div className="flex gap-1.5 flex-wrap">
+                    {allTours.map((t) => {
+                      const tourLaunched = tours.includes(t);
+                      const partiesTour = parties.filter((p) => p.tour === t);
+                      const isComplete = tourLaunched && partiesTour.length > 0 && partiesTour.every((p) => p.statut === 'TERMINEE' || p.statut === 'FORFAIT');
+                      const isInProgress = tourLaunched && partiesTour.some((p) => p.statut === 'EN_COURS' || p.statut === 'A_JOUER');
+                      
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => setTourActif(t)}
+                          disabled={!tourLaunched}
+                          className={cn(
+                            'min-w-[2.5rem] h-10 px-3 rounded-lg text-sm font-medium transition-colors relative',
+                            tourActif === t
+                              ? 'bg-primary-500 text-white'
+                              : tourLaunched
+                                ? 'bg-dark-400 text-dark-50 hover:text-gray-100'
+                                : 'bg-dark-400/30 text-dark-200 cursor-not-allowed',
+                          )}
+                        >
+                          <span className="relative">
+                            Tour {t}
+                            {isComplete && (
+                              <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-success-500 rounded-full" />
+                            )}
+                            {isInProgress && (
+                              <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-warning-500 rounded-full animate-pulse" />
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <button
-                    onClick={() =>
-                      setTourActif((t) => Math.min(canLancerNext ? nextTour : maxTour, t + 1))
-                    }
-                    disabled={tourActif >= (canLancerNext ? nextTour : maxTour)}
-                    className="p-1.5 rounded-lg text-dark-50 hover:text-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight size={18} />
-                  </button>
                 </div>
               )}
 
