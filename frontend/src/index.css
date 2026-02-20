@@ -1,0 +1,319 @@
+@import "tailwindcss";
+
+/* ─── Design Tokens ──────────────────────────────────────────────────────── */
+@theme {
+  /* Primary (deep blue) */
+  --color-primary-50:  #e6eef7;
+  --color-primary-100: #ccddef;
+  --color-primary-200: #99bbdf;
+  --color-primary-300: #6699cf;
+  --color-primary-400: #3377bf;
+  --color-primary-500: #2D6CDF;
+  --color-primary-600: #1E3A5F;
+  --color-primary-700: #182d4a;
+  --color-primary-800: #122035;
+  --color-primary-900: #0c1420;
+
+  /* Success (emerald) */
+  --color-success-50:  #e6f7f0;
+  --color-success-100: #ccefe1;
+  --color-success-200: #99dfc3;
+  --color-success-300: #66cfa5;
+  --color-success-400: #33bf87;
+  --color-success-500: #2ECC71;
+  --color-success-600: #1A7A4A;
+  --color-success-700: #145c38;
+  --color-success-800: #0e3d25;
+  --color-success-900: #071f13;
+
+  /* Warning (orange) */
+  --color-warning-50:  #fcf3e6;
+  --color-warning-100: #f9e7cd;
+  --color-warning-200: #f3cf9b;
+  --color-warning-300: #edb769;
+  --color-warning-400: #e79f37;
+  --color-warning-500: #F39C12;
+  --color-warning-600: #E07B20;
+  --color-warning-700: #a85b18;
+  --color-warning-800: #703c10;
+  --color-warning-900: #381e08;
+
+  /* Dark (background scale) */
+  --color-dark-50:  #7a9bb5;
+  --color-dark-100: #4a6b85;
+  --color-dark-200: #3a5b75;
+  --color-dark-300: #2a4b65;
+  --color-dark-400: #1c2b38;
+  --color-dark-500: #0F1923;
+  --color-dark-600: #0a1219;
+  --color-dark-700: #050a0f;
+
+  /* Fonts */
+  --font-sans:    'Inter', system-ui, sans-serif;
+  --font-display: 'Barlow Condensed', system-ui, sans-serif;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: var(--color-dark-300);
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-dark-500);
+    color: theme(colors.gray.100);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1 { font-family: var(--font-display); font-size: 2.25rem; font-weight: 700; letter-spacing: -0.025em; }
+  h2 { font-family: var(--font-display); font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em; }
+  h3 { font-family: var(--font-display); font-size: 1.5rem;   font-weight: 700; letter-spacing: -0.025em; }
+  h4 { font-family: var(--font-display); font-size: 1.25rem;  font-weight: 600; }
+  h5 { font-family: var(--font-display); font-size: 1.125rem; font-weight: 600; }
+  h6 { font-family: var(--font-display); font-size: 1rem;     font-weight: 600; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar       { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--color-dark-400); }
+  ::-webkit-scrollbar-thumb { background: var(--color-dark-200); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-dark-100); }
+
+  /* Selection */
+  ::selection { background-color: color-mix(in srgb, var(--color-primary-500) 30%, transparent); color: var(--color-primary-100); }
+
+  /* Focus */
+  *:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-dark-500), 0 0 0 4px var(--color-primary-500); }
+}
+
+/* ─── Components ─────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* Card */
+  .card {
+    background-color: var(--color-dark-400);
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    padding: 1.5rem;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    cursor: pointer;
+    border: none;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.875rem; }
+  .btn-lg { padding: 0.75rem 1.5rem; font-size: 1rem; }
+
+  .btn-primary   { background-color: var(--color-primary-500); color: white; }
+  .btn-primary:hover:not(:disabled) { background-color: var(--color-primary-600); }
+
+  .btn-success   { background-color: var(--color-success-500); color: white; }
+  .btn-success:hover:not(:disabled) { background-color: var(--color-success-600); }
+
+  .btn-warning   { background-color: var(--color-warning-500); color: white; }
+  .btn-warning:hover:not(:disabled) { background-color: var(--color-warning-600); }
+
+  .btn-secondary {
+    background-color: var(--color-dark-300);
+    color: theme(colors.gray.200);
+    border: 1px solid var(--color-dark-200);
+  }
+  .btn-secondary:hover:not(:disabled) { background-color: var(--color-dark-200); }
+
+  .btn-danger { background-color: theme(colors.red.700); color: white; }
+  .btn-danger:hover:not(:disabled) { background-color: theme(colors.red.600); }
+
+  /* Input */
+  .input {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    background-color: var(--color-dark-300);
+    border: 1px solid var(--color-dark-200);
+    border-radius: 0.375rem;
+    color: theme(colors.gray.100);
+    font-size: 0.875rem;
+  }
+  .input::placeholder { color: theme(colors.gray.500); }
+  .input:focus { outline: none; box-shadow: 0 0 0 2px var(--color-primary-500); border-color: transparent; }
+
+  .label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: theme(colors.gray.300);
+    margin-bottom: 0.25rem;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  .badge-success {
+    background-color: color-mix(in srgb, var(--color-success-600) 20%, transparent);
+    color: var(--color-success-400);
+    border: 1px solid color-mix(in srgb, var(--color-success-600) 30%, transparent);
+  }
+  .badge-warning {
+    background-color: color-mix(in srgb, var(--color-warning-600) 20%, transparent);
+    color: var(--color-warning-400);
+    border: 1px solid color-mix(in srgb, var(--color-warning-600) 30%, transparent);
+  }
+  .badge-primary {
+    background-color: color-mix(in srgb, var(--color-primary-600) 20%, transparent);
+    color: var(--color-primary-400);
+    border: 1px solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+  }
+  .badge-secondary {
+    background-color: var(--color-dark-200);
+    color: theme(colors.gray.300);
+    border: 1px solid var(--color-dark-100);
+  }
+  .badge-error {
+    background-color: color-mix(in srgb, theme(colors.red.600) 20%, transparent);
+    color: theme(colors.red.400);
+    border: 1px solid color-mix(in srgb, theme(colors.red.600) 30%, transparent);
+  }
+
+  /* Score Display */
+  .score-display {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 6vw, 4.5rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-winner { color: var(--color-success-400); }
+  .score-loser  { color: theme(colors.gray.500); }
+
+  /* Match Cards */
+  .match-card          { background-color: var(--color-dark-400); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); position: relative; overflow: hidden; padding: 1.5rem; }
+  .match-card-active   { border: 2px solid var(--color-warning-500); box-shadow: 0 10px 15px -3px color-mix(in srgb, var(--color-warning-500) 20%, transparent); }
+  .match-card-finished { border: 1px solid color-mix(in srgb, var(--color-success-600) 30%, transparent); }
+
+  /* Ranking */
+  .ranking-row { display: flex; align-items: center; justify-content: space-between; padding: 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+  .ranking-row:nth-child(odd)  { background-color: color-mix(in srgb, var(--color-dark-400) 50%, transparent); }
+  .ranking-row:nth-child(even) { background-color: color-mix(in srgb, var(--color-dark-400) 30%, transparent); }
+  .ranking-row:hover { background-color: var(--color-dark-300); transform: scale(1.005); }
+  .ranking-podium-1 {
+    background: linear-gradient(to right, color-mix(in srgb, theme(colors.yellow.500) 20%, transparent), color-mix(in srgb, theme(colors.yellow.600) 10%, transparent));
+    border: 2px solid color-mix(in srgb, theme(colors.yellow.500) 50%, transparent);
+    box-shadow: 0 10px 15px -3px color-mix(in srgb, theme(colors.yellow.500) 20%, transparent);
+  }
+  .ranking-podium-2 {
+    background: linear-gradient(to right, color-mix(in srgb, theme(colors.gray.400) 20%, transparent), color-mix(in srgb, theme(colors.gray.500) 10%, transparent));
+    border: 2px solid color-mix(in srgb, theme(colors.gray.400) 50%, transparent);
+    box-shadow: 0 10px 15px -3px color-mix(in srgb, theme(colors.gray.400) 20%, transparent);
+  }
+  .ranking-podium-3 {
+    background: linear-gradient(to right, color-mix(in srgb, theme(colors.orange.600) 20%, transparent), color-mix(in srgb, theme(colors.orange.700) 10%, transparent));
+    border: 2px solid color-mix(in srgb, theme(colors.orange.600) 50%, transparent);
+    box-shadow: 0 10px 15px -3px color-mix(in srgb, theme(colors.orange.600) 20%, transparent);
+  }
+
+  /* Position Badges */
+  .position-badge {
+    width: 3rem; height: 3rem;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 9999px;
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    flex-shrink: 0;
+  }
+  .position-badge-gold   { background: linear-gradient(to bottom right, theme(colors.yellow.400), theme(colors.yellow.600)); color: theme(colors.yellow.900); }
+  .position-badge-silver { background: linear-gradient(to bottom right, theme(colors.gray.300),   theme(colors.gray.500));   color: theme(colors.gray.900); }
+  .position-badge-bronze { background: linear-gradient(to bottom right, theme(colors.orange.500), theme(colors.orange.700)); color: white; }
+  .position-badge-default{ background-color: var(--color-dark-200); color: theme(colors.gray.300); }
+
+  /* Terrain */
+  .terrain-number {
+    font-family: var(--font-display);
+    font-size: clamp(4rem, 8vw, 6rem);
+    font-weight: 900;
+    color: var(--color-warning-400);
+  }
+  .terrain-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    background-color: color-mix(in srgb, var(--color-primary-600) 20%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary-600) 40%, transparent);
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-primary-300);
+  }
+
+  /* Status dots */
+  .status-indicator { width: 0.75rem; height: 0.75rem; border-radius: 9999px; animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  .status-waiting   { background-color: theme(colors.gray.400); }
+  .status-active    { background-color: var(--color-warning-500); }
+  .status-finished  { background-color: var(--color-success-500); }
+  .status-forfeit   { background-color: theme(colors.red.500); }
+
+  /* Progress Bar */
+  .progress-bar  { position: relative; height: 0.5rem; background-color: var(--color-dark-300); border-radius: 9999px; overflow: hidden; }
+  .progress-fill { position: absolute; top: 0; left: 0; height: 100%; background: linear-gradient(to right, var(--color-primary-500), var(--color-primary-400)); transition: width 0.5s; }
+
+  /* Stat pills */
+  .stat-pill           { display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 500; font-size: 0.875rem; }
+  .stat-pill-victories { background-color: color-mix(in srgb, var(--color-success-600) 30%, transparent); color: var(--color-success-300); border: 1px solid color-mix(in srgb, var(--color-success-600) 50%, transparent); }
+  .stat-pill-quotient  { background-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent); color: var(--color-primary-300); border: 1px solid color-mix(in srgb, var(--color-primary-600) 50%, transparent); }
+  .stat-pill-points    { background-color: var(--color-dark-200); color: theme(colors.gray.300); border: 1px solid var(--color-dark-100); }
+
+  /* Skeleton */
+  .skeleton { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; background-color: var(--color-dark-300); border-radius: 0.25rem; }
+
+  /* Convocation banner */
+  .convocation-banner {
+    background-color: color-mix(in srgb, var(--color-warning-600) 20%, transparent);
+    border: 2px solid var(--color-warning-500);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Public display */
+  .public-header   { text-align: center; padding: 2rem 0; background: linear-gradient(to bottom, color-mix(in srgb, var(--color-primary-600) 20%, transparent), transparent); }
+  .public-title    { font-family: var(--font-display); font-size: clamp(3.5rem, 8vw, 5rem); font-weight: 900; color: var(--color-primary-400); filter: drop-shadow(0 10px 8px rgb(0 0 0 / 0.04)) drop-shadow(0 4px 3px rgb(0 0 0 / 0.1)); }
+  .public-subtitle { font-size: clamp(1.25rem, 3vw, 2rem); color: theme(colors.gray.300); margin-top: 1rem; }
+
+  /* Bracket */
+  .bracket-line  { border-left: 2px solid var(--color-dark-200); border-top: 2px solid var(--color-dark-200); }
+  .bracket-match { background-color: var(--color-dark-400); border-radius: 0.5rem; padding: 0.75rem; cursor: pointer; transition: all 0.2s; }
+  .bracket-match:hover { border-color: var(--color-primary-500); }
+
+  /* Animations */
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.8; }
+  }
+  .animate-pulse-slow { animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+}

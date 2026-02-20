@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ORGANISATEUR
+  ARBITRE
+  CAPITAINE
+  SPECTATEUR
+}
+
+enum Genre {
+  H
+  F
+}
+
+enum Categorie {
+  SENIOR
+  VETERAN
+  FEMININ
+  JEUNE
+}
+
+enum FormatConcours {
+  MELEE
+  COUPE
+  CHAMPIONNAT
+}
+
+enum TypeEquipe {
+  TETE_A_TETE
+  DOUBLETTE
+  TRIPLETTE
+}
+
+enum ModeConstitution {
+  MELEE_DEMELEE
+  MELEE
+  MONTEE
+}
+
+enum StatutConcours {
+  INSCRIPTION
+  EN_COURS
+  TERMINE
+}
+
+enum StatutEquipe {
+  INSCRITE
+  PRESENTE
+  FORFAIT
+  DISQUALIFIEE
+}
+
+enum StatutPartie {
+  A_JOUER
+  EN_COURS
+  TERMINEE
+  LITIGE
+  FORFAIT
+}
+
+enum TypePartie {
+  MELEE
+  COUPE_PRINCIPALE
+  COUPE_CONSOLANTE
+  CHAMPIONNAT_POULE
+  CHAMPIONNAT_FINALE
+}
+
+model Joueur {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String
+  nom            String
+  prenom         String
+  genre          Genre
+  dateNaissance  DateTime?
+  licenceFfpjp   String?
+  club           String?
+  categorie      Categorie @default(SENIOR)
+  role           Role      @default(SPECTATEUR)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  equipeJoueurs  EquipeJoueur[]
+  concoursOrganises Concours[] @relation("OrganisateurConcours")
+
+  @@map("joueurs")
+}
+
+model Concours {
+  id                  String           @id @default(uuid())
+  nom                 String
+  lieu                String?
+  format              FormatConcours
+  typeEquipe          TypeEquipe
+  modeConstitution    ModeConstitution
+  statut              StatutConcours   @default(INSCRIPTION)
+  nbTerrains          Int
+  maxParticipants     Int?
+  dateDebut           DateTime
+  dateFin             DateTime
+  params              Json             @default("{}")
+  organisateurId      String
+  organisateur        Joueur           @relation("OrganisateurConcours", fields: [organisateurId], references: [id])
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  equipes             Equipe[]
+  terrains            Terrain[]
+  parties             Partie[]
+  poules              Poule[]
+  tiragesLog          TirageLog[]
+  classements         Classement[]
+
+  @@map("concours")
+}
+
+model Terrain {
+  id          String   @id @default(uuid())
+  concoursId  String
+  numero      Int
+  emplacement String?
+  concours    Concours @relation(fields: [concoursId], references: [id], onDelete: Cascade)
+  parties     Partie[]
+
+  @@unique([concoursId, numero])
+  @@map("terrains")
+}
+
+model Equipe {
+  id            String       @id @default(uuid())
+  concoursId    String
+  nom           String?
+  numeroTirage  Int?
+  statut        StatutEquipe @default(INSCRITE)
+  concours      Concours     @relation(fields: [concoursId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  joueurs       EquipeJoueur[]
+  pouleEquipes  PouleEquipe[]
+  partiesA      Partie[]     @relation("PartieEquipeA")
+  partiesB      Partie[]     @relation("PartieEquipeB")
+  classements   Classement[]
+
+  @@map("equipes")
+}
+
+model EquipeJoueur {
+  equipeId  String
+  joueurId  String
+  equipe    Equipe @relation(fields: [equipeId], references: [id], onDelete: Cascade)
+  joueur    Joueur @relation(fields: [joueurId], references: [id])
+
+  @@id([equipeId, joueurId])
+  @@map("equipe_joueurs")
+}
+
+model Poule {
+  id          String      @id @default(uuid())
+  concoursId  String
+  numero      Int
+  statut      String      @default("EN_COURS")
+  concours    Concours    @relation(fields: [concoursId], references: [id], onDelete: Cascade)
+
+  equipes     PouleEquipe[]
+  parties     Partie[]
+
+  @@unique([concoursId, numero])
+  @@map("poules")
+}
+
+model PouleEquipe {
+  pouleId  String
+  equipeId String
+  poule    Poule  @relation(fields: [pouleId], references: [id], onDelete: Cascade)
+  equipe   Equipe @relation(fields: [equipeId], references: [id])
+
+  @@id([pouleId, equipeId])
+  @@map("poule_equipes")
+}
+
+model Partie {
+  id           String       @id @default(uuid())
+  concoursId   String
+  tour         Int?
+  pouleId      String?
+  equipeAId    String
+  equipeBId    String
+  terrainId    String?
+  scoreA       Int?
+  scoreB       Int?
+  statut       StatutPartie @default(A_JOUER)
+  type         TypePartie
+  bracketRonde Int?
+  bracketPos   Int?
+  heureDebut   DateTime?
+  heureFinEst  DateTime?
+  heureFin     DateTime?
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  concours  Concours  @relation(fields: [concoursId], references: [id], onDelete: Cascade)
+  poule     Poule?    @relation(fields: [pouleId], references: [id])
+  equipeA   Equipe    @relation("PartieEquipeA", fields: [equipeAId], references: [id])
+  equipeB   Equipe    @relation("PartieEquipeB", fields: [equipeBId], references: [id])
+  terrain   Terrain?  @relation(fields: [terrainId], references: [id])
+
+  @@unique([concoursId, tour, equipeAId, equipeBId])
+  @@map("parties")
+}
+
+model Classement {
+  id               String   @id @default(uuid())
+  concoursId       String
+  equipeId         String
+  victoires        Int      @default(0)
+  defaites         Int      @default(0)
+  pointsMarques    Int      @default(0)
+  pointsEncaisses  Int      @default(0)
+  quotient         Float    @default(0)
+  rang             Int?
+  updatedAt        DateTime @updatedAt
+
+  concours  Concours @relation(fields: [concoursId], references: [id], onDelete: Cascade)
+  equipe    Equipe   @relation(fields: [equipeId], references: [id])
+
+  @@unique([concoursId, equipeId])
+  @@map("classements")
+}
+
+model TirageLog {
+  id           String   @id @default(uuid())
+  concoursId   String
+  tour         Int?
+  seed         String
+  contraintes  Json
+  appariements Json
+  createdAt    DateTime @default(now())
+
+  concours Concours @relation(fields: [concoursId], references: [id], onDelete: Cascade)
+
+  @@map("tirages_log")
+}

@@ -9,7 +9,7 @@ Full specification in French: `Specifications.MD`.
 
 | Component | Technology |
 |-----------|------------|
-| Frontend | React + Zustand + TailwindCSS + react-pdf |
+| Frontend | React 19 + Zustand + TailwindCSS v4 + react-hook-form + Zod |
 | Backend API | Node.js + NestJS |
 | Database | PostgreSQL (Prisma ORM) |
 | Cache/Sessions | Redis (JWT refresh tokens + distributed draw lock via SETNX) |
@@ -27,28 +27,32 @@ Full specification in French: `Specifications.MD`.
 # Backend (NestJS + Jest)
 cd backend
 npm install
-npm run build
-npm run start:dev
-npm run lint
-npm run test                              # all unit tests
-npm run test -- --testPathPattern=draw   # single file by pattern
-npm run test -- --testNamePattern="draw algorithm"  # single test by name
-npm run test:e2e
+npm run build                                          # tsc -p tsconfig.build.json
+npm run start:dev                                      # ts-node-dev with path aliases
+npm run lint                                           # eslint --fix
+npm run test                                           # jest (all *.spec.ts under src/)
+npm run test -- --testPathPattern=tirage              # single file by path pattern
+npm run test -- --testNamePattern="should pair all"   # single test by name
+npm run test:watch                                     # jest --watch
+npm run test:cov                                       # jest --coverage
+npm run test:e2e                                       # jest --config test/jest-e2e.json
+npm run prisma:generate                                # regenerate Prisma client
+npm run prisma:migrate                                 # run migrations (dev)
 
-# Frontend (React + Vitest or Jest)
+# Frontend (React + Vitest)
 cd frontend
 npm install
-npm run build
-npm run dev
-npm run lint
-npm run typecheck
-npm run test
-npm run test -- --watch
-npm run test -- TournamentCard.test.tsx  # single test file
+npm run build                                          # tsc && vite build
+npm run dev                                            # vite dev server on :5173
+npm run lint                                           # eslint src --ext .ts,.tsx --fix
+npm run typecheck                                      # tsc --noEmit
+npm run test                                           # vitest run (single pass)
+npm run test:watch                                     # vitest (interactive)
+npm run test:ui                                        # vitest --ui
 ```
 
-> Commands will be confirmed once the project is scaffolded. The patterns above
-> follow NestJS (Jest) and Vite (Vitest) defaults.
+Test files: backend uses `*.spec.ts` (Jest); frontend uses `*.test.ts(x)` (Vitest, jsdom env).
+Frontend test setup file: `frontend/src/test/setup.ts`.
 
 ---
 
@@ -57,27 +61,33 @@ npm run test -- TournamentCard.test.tsx  # single test file
 ```
 /
 ├── backend/
+│   ├── prisma/
+│   │   └── schema.prisma
 │   ├── src/
+│   │   ├── common/          # guards, filters, decorators, pipes
 │   │   ├── modules/
 │   │   │   ├── auth/
-│   │   │   ├── tournaments/
-│   │   │   ├── teams/
-│   │   │   ├── players/
-│   │   │   ├── matches/
-│   │   │   ├── draw/        # pure service, no side-effects — exhaustively tested
-│   │   │   └── scoring/
-│   │   ├── common/          # guards, filters, decorators, pipes
-│   │   └── prisma/
-│   └── test/                # e2e tests
+│   │   │   ├── classement/
+│   │   │   ├── concours/    # tournaments: controller, service, dto/
+│   │   │   ├── equipes/     # teams
+│   │   │   ├── gateway/     # Socket.io WebSocket gateway
+│   │   │   ├── joueurs/     # players
+│   │   │   ├── parties/     # matches
+│   │   │   ├── pdf/
+│   │   │   └── tirage/      # draw algorithm — pure service, exhaustively tested
+│   │   ├── prisma/
+│   │   └── main.ts
+│   └── test/                # e2e tests + jest-e2e.json
 ├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── stores/          # Zustand stores
-│   │   ├── hooks/
-│   │   ├── api/             # REST client functions
-│   │   └── types/
-│   └── __tests__/
+│   └── src/
+│       ├── api/             # axios REST client functions (one file per resource)
+│       ├── components/      # feature-based: concours/, match/, classement/, common/, layout/
+│       ├── hooks/
+│       ├── lib/
+│       ├── pages/
+│       ├── stores/          # Zustand stores: authStore.ts, concoursStore.ts
+│       ├── test/            # setup.ts
+│       └── types/
 └── docker-compose.yml
 ```
 
@@ -88,41 +98,44 @@ npm run test -- TournamentCard.test.tsx  # single test file
 ### General Principles
 
 - **No comments** unless explicitly requested
-- **TypeScript strict mode** everywhere
-- **ESLint + Prettier** enforced — run lint/typecheck before every commit
+- **TypeScript strict mode** everywhere (`strict: true`, `noImplicitAny`, `noUnusedLocals/Parameters`)
+- **ESLint + Prettier** enforced — run lint and typecheck before every commit
 - **Feature-based** folder structure (each module owns its types, service, controller, tests)
 - No business logic in the frontend — all rules (scoring, draw, ranking) live in the backend
 
-### Formatting
+### Formatting (from `backend/.prettierrc`)
 
-- 2-space indentation
-- Single quotes for strings
-- Trailing commas
-- Semicolons required
-- Max line length: 100 characters
+```json
+{ "singleQuote": true, "trailingComma": "all", "semi": true, "printWidth": 100, "tabWidth": 2 }
+```
+
+- 2-space indentation, single quotes, trailing commas, semicolons required, max 100 chars
 
 ### Imports
 
 ```typescript
 // Order: external → internal (@/) → relative
-import { Injectable } from '@nestjs/common'
-import { PrismaService } from '@/prisma/prisma.service'
-import { CreateTournamentDto } from './dto/create-tournament.dto'
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '@/prisma/prisma.service';
+import { CreateConcoursDto } from './dto/create-concours.dto';
 ```
+
+Path alias `@/` maps to `src/` in both backend and frontend (`tsconfig.json` paths + moduleNameMapper in Jest).
 
 ### Types
 
 ```typescript
-// Interfaces for data shapes; types for unions/aliases
-interface Team {
+// Interfaces for data shapes; type aliases for unions/mapped types
+interface EquipeInfo {
   id: string;
-  name: string;
-  players: Player[];
+  victoires: number;
+  club?: string;
+  adversairesDejaRencontres: string[];
 }
 
-type TournamentStatus = 'draft' | 'registration' | 'in_progress' | 'completed';
+type StatutConcours = 'INSCRIPTION' | 'EN_COURS' | 'TERMINE';
 
-// Explicit return types on all functions
+// Explicit return types required on all functions (ESLint rule: error)
 function calculateQuotient(scored: number, conceded: number): number {
   return conceded === 0 ? scored : scored / conceded;
 }
@@ -133,88 +146,106 @@ function calculateQuotient(scored: number, conceded: number): number {
 | Element | Convention | Example |
 |---------|------------|---------|
 | Files (components) | PascalCase | `TournamentCard.tsx` |
-| Files (utils/hooks) | camelCase | `useTournament.ts` |
-| Functions/methods | camelCase | `getTeamsByScore()` |
-| Components | PascalCase | `<TeamList />` |
+| Files (utils/hooks/api) | camelCase | `useConcours.ts`, `concours.ts` |
+| Functions/methods | camelCase | `tirageMelee()`, `findOne()` |
+| React components | PascalCase | `<MatchCard />` |
 | Constants | UPPER_SNAKE_CASE | `MAX_PLAYERS = 3` |
-| Interfaces | PascalCase | `interface Match {}` |
-| Enums | PascalCase | `TournamentFormat.Melee` |
-| Database tables | snake_case | `tournament_teams` |
+| Interfaces | PascalCase | `interface EquipeInfo {}` |
+| Enums (Prisma/TS) | UPPER_SNAKE_CASE values | `FormatConcours.MELEE` |
+| Database tables | snake_case | `equipe_joueurs`, `tirages_log` |
 | Prisma models | PascalCase singular | `model Concours {}` |
+| Domain terms | French | `concours`, `equipe`, `partie`, `joueur`, `tirage` |
 
 ### Error Handling
 
 ```typescript
 // Backend: NestJS built-in HTTP exceptions
-throw new NotFoundException(`Team ${id} not found`);
-throw new BadRequestException('Score must be exactly 13 for the winner');
-throw new ConflictException('Team has already played this opponent in round 2');
+throw new NotFoundException(`Concours ${id} introuvable`);
+throw new BadRequestException('Impossible de modifier un concours déjà démarré');
+throw new ForbiddenException('Accès refusé');
+throw new ConflictException('Cette équipe a déjà joué cet adversaire');
 
-// Frontend: React Query + toast
-const { data, error, isError } = useQuery(...);
+// Frontend: TanStack Query + react-hot-toast
+const { data, error, isError } = useQuery({ queryKey: [...], queryFn: ... });
 if (isError) toast.error(error.message);
 ```
 
 ### API Design (NestJS)
 
 ```typescript
-@Controller('tournaments')
-export class TournamentController {
-  @Get()         findAll(): Promise<Tournament[]>
-  @Get(':id')    findOne(@Param('id') id: string): Promise<Tournament>
-  @Post()        create(@Body() dto: CreateTournamentDto): Promise<Tournament>
-  @Patch(':id')  update(@Param('id') id: string, @Body() dto: UpdateTournamentDto)
-  @Delete(':id') remove(@Param('id') id: string)
+@Controller('concours')
+@UseGuards(AuthGuard('jwt'))
+export class ConcoursController {
+  constructor(private concoursService: ConcoursService) {}
+
+  @Get()           findAll(): Promise<Concours[]>
+  @Get(':id')      findOne(@Param('id') id: string): Promise<Concours>
+  @Post()          create(@Body() dto: CreateConcoursDto, @CurrentUser() user: JwtPayload): Promise<Concours>
+  @Patch(':id')    update(@Param('id') id: string, @Body() dto: UpdateConcoursDto): Promise<Concours>
+  @Delete(':id')   remove(@Param('id') id: string): Promise<void>
+  @Post(':id/demarrer')  demarrer(@Param('id') id: string): Promise<Concours>
 }
 ```
 
 ### Database (Prisma)
 
-```prisma
-model Concours {
-  id        String            @id @default(uuid())
-  nom       String
-  format    ConcourFormat
-  statut    ConcourStatut
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  equipes   Equipe[]
-  parties   Partie[]
-}
-```
+All domain models use French names matching the spec. Key constraints to preserve:
 
-Key DB constraints (must be preserved in migrations):
-- `parties`: unique composite `(concours_id, tour, equipe_a_id, equipe_b_id)`
-- `classements`: implemented as materialized view, refreshed after each score validation
-- `tirages_log`: stores random seed + active constraints + pairings for traceability
+- `parties`: `@@unique([concoursId, tour, equipeAId, equipeBId])`
+- `classements`: `@@unique([concoursId, equipeId])` — refreshed after each score validation
+- `tirages_log`: stores `seed` + `contraintes` + `appariements` JSON for traceability
+- `terrains`: `@@unique([concoursId, numero])`
 
 ### State Management (Zustand)
 
 ```typescript
-// stores/tournamentStore.ts
-interface TournamentStore {
-  current: Tournament | null;
-  setCurrent: (t: Tournament) => void;
+// stores/authStore.ts pattern — use persist middleware when state must survive reload
+interface AuthStore {
+  accessToken: string | null;
+  user: JwtUser | null;
+  setTokens: (accessToken: string, refreshToken: string) => void;
+  logout: () => void;
+  hasRole: (...roles: Role[]) => boolean;
 }
 
-export const useTournamentStore = create<TournamentStore>((set) => ({
-  current: null,
-  setCurrent: (t) => set({ current: t }),
-}));
+export const useAuthStore = create<AuthStore>()(
+  persist((set, get) => ({ ... }), { name: 'auth-store', partialize: (s) => ({ ... }) }),
+);
 ```
 
 ### React Components
 
 ```typescript
+// Props interface directly above the component, no default exports for components
 interface MatchCardProps {
   match: Match;
   onScoreSubmit?: (matchId: string, scoreA: number, scoreB: number) => void;
 }
 
 export function MatchCard({ match, onScoreSubmit }: MatchCardProps) {
-  return <Card>...</Card>;
+  return <div>...</div>;
 }
 ```
+
+Form validation uses `react-hook-form` + `zod` via `@hookform/resolvers`.
+
+### Testing (Backend — Jest)
+
+Test files are co-located with the module as `*.spec.ts`. The `tirage` module is the most
+exhaustively tested — use it as the reference pattern:
+
+```typescript
+describe('tirageMelee', () => {
+  it('should pair all teams when even count', () => {
+    const equipes = [makeEquipe('A', 2), makeEquipe('B', 2)];
+    const result = tirageMelee(equipes, 2, 'seed1');
+    expect(result.appariements).toHaveLength(1);
+  });
+});
+```
+
+Pure service functions (no DB, no side-effects) are tested directly without NestJS TestingModule.
+Use `@nestjs/testing` only for integration tests that require DI.
 
 ### Git Conventions
 
@@ -227,32 +258,25 @@ export function MatchCard({ match, onScoreSubmit }: MatchCardProps) {
 ## Key Business Rules
 
 1. **Score**: winner must have exactly 13 points; both scores always recorded (e.g. 13-7)
-2. **Team sizes**: Tête-à-tête=1, Doublette=2, Triplette=3 players
-3. **Tournament formats**: Mêlée (Swiss rounds), Coupe (elimination ± consolante), Championnat (pools → bracket)
-4. **Team constitution modes**:
-   - *Mêlée-Démêlée*: individual signup, random teams each round (Mêlée format only)
-   - *Mêlée*: individual signup, random teams formed once at start
-   - *Montée*: pre-formed teams register as a unit
-5. **Ranking priority** (both for pool standings and final Mêlée ranking):
-   1. Wins
-   2. Point quotient (`points_scored / points_conceded`)
-   3. Points scored
-   4. Random draw as final tiebreaker
-6. **Draw algorithm** (Mêlée rounds): group by wins → random pairings within group → avoid rematches → bye (13-0) if odd count → optional: avoid same-club matches early
-7. **Forfeit**: pre-match forfeit = 13-0 to opponent; mid-match forfeit = score frozen at current value
-8. **Redis draw lock**: use `SETNX` to prevent concurrent draw triggers on the same round
+2. **Team sizes**: Tête-à-tête=1 (`TETE_A_TETE`), Doublette=2, Triplette=3 players
+3. **Tournament formats**: `MELEE` (Swiss rounds), `COUPE` (elimination ± consolante), `CHAMPIONNAT` (pools → bracket)
+4. **Constitution modes**: `MELEE_DEMELEE` (random teams each round), `MELEE` (random teams once at start), `MONTEE` (pre-formed)
+5. **Ranking priority**: 1) Wins 2) Quotient (`pointsMarques / pointsEncaisses`) 3) Points scored 4) Random tiebreaker
+6. **Draw algorithm** (`tirageMelee`): group by wins → random pairings within group → avoid rematches → bye (13-0) if odd → optional `eviterMemeClub`
+7. **Forfeit**: pre-match = 13-0 to opponent; mid-match = score frozen
+8. **Redis draw lock**: `SETNX` to prevent concurrent draw triggers on the same round
 
 ---
 
 ## User Roles
 
-| Role | Permissions |
-|------|------------|
-| Super Admin | Global settings, licence management |
-| Organisateur | Create/manage tournaments |
-| Arbitre | Score entry/validation, dispute resolution |
-| Capitaine | Read + submit own team scores |
-| Spectateur | Read-only public results |
+| Role | Prisma enum | Permissions |
+|------|-------------|------------|
+| Super Admin | `SUPER_ADMIN` | Global settings, licence management |
+| Organisateur | `ORGANISATEUR` | Create/manage tournaments |
+| Arbitre | `ARBITRE` | Score entry/validation, dispute resolution |
+| Capitaine | `CAPITAINE` | Read + submit own team scores |
+| Spectateur | `SPECTATEUR` | Read-only public results |
 
 ---
 
@@ -265,5 +289,5 @@ export function MatchCard({ match, onScoreSubmit }: MatchCardProps) {
 - **Text**: `#E8EDF2` (primary), `#7A9BB5` (secondary)
 - **Fonts**: Inter (UI text) + Barlow Condensed Bold (scores, rankings, terrain numbers)
 - **Score display**: minimum 48px for TV-visible screens
-- **Contrast**: WCAG AA (4.5:1 for body text, 3:1 for large text/graphics)
+- **Contrast**: WCAG AA (4.5:1 body text, 3:1 large text/graphics)
 - **Breakpoints**: mobile <768px, tablet 768–1280px, desktop >1280px
