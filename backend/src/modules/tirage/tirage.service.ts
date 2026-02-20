@@ -226,8 +226,11 @@ export function constituerEquipesMelee(
       equipes.push(shuffled.slice(i, i + tailleEquipe));
       i += tailleEquipe;
     } else {
-      // Dernier groupe incomplet : taille (tailleEquipe - 1) minimum
-      equipes.push(shuffled.slice(i));
+      if (equipes.length > 0) {
+        equipes[equipes.length - 1].push(...shuffled.slice(i));
+      } else {
+        equipes.push(shuffled.slice(i));
+      }
       break;
     }
   }
