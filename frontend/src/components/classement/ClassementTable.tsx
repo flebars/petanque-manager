@@ -1,16 +1,22 @@
-import type { Classement } from '@/types';
+import type { Classement, ClassementJoueur } from '@/types';
 import { PodiumBadge } from '@/components/common/PodiumBadge';
 import { nomEquipe } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 interface ClassementTableProps {
-  classements: Classement[];
+  classements: Classement[] | ClassementJoueur[];
   highlightEquipeId?: string;
+  mode: 'equipe' | 'joueur';
+}
+
+function isClassementJoueur(c: Classement | ClassementJoueur): c is ClassementJoueur {
+  return 'joueurId' in c;
 }
 
 export function ClassementTable({
   classements,
   highlightEquipeId,
+  mode,
 }: ClassementTableProps): JSX.Element {
   if (classements.length === 0) {
     return (
@@ -26,7 +32,9 @@ export function ClassementTable({
         <thead>
           <tr className="border-b border-dark-300 bg-dark-500">
             <th className="py-3 px-4 text-left font-medium text-dark-50 w-12">Rang</th>
-            <th className="py-3 px-4 text-left font-medium text-dark-50">Équipe</th>
+            <th className="py-3 px-4 text-left font-medium text-dark-50">
+              {mode === 'joueur' ? 'Joueur' : 'Équipe'}
+            </th>
             <th className="py-3 px-4 text-center font-medium text-dark-50 w-16">V</th>
             <th className="py-3 px-4 text-center font-medium text-dark-50 w-16">D</th>
             <th className="py-3 px-4 text-center font-medium text-dark-50 w-20">Pts +</th>
@@ -37,10 +45,20 @@ export function ClassementTable({
         <tbody>
           {classements.map((cl, idx) => {
             const rang = cl.rang ?? idx + 1;
-            const isHighlighted = highlightEquipeId === cl.equipeId;
-            const equipeNom = cl.equipe ? nomEquipe(cl.equipe) : cl.equipeId;
-            const joueurs = cl.equipe?.joueurs ?? [];
-            const club = joueurs[0]?.joueur?.club;
+            
+            let nom: string;
+            let club: string | undefined;
+            let isHighlighted = false;
+
+            if (isClassementJoueur(cl)) {
+              nom = `${cl.joueur.prenom} ${cl.joueur.nom}`;
+              club = cl.joueur.club;
+            } else {
+              isHighlighted = highlightEquipeId === cl.equipeId;
+              nom = cl.equipe ? nomEquipe(cl.equipe) : cl.equipeId;
+              const joueurs = cl.equipe?.joueurs ?? [];
+              club = joueurs[0]?.joueur?.club;
+            }
 
             return (
               <tr
@@ -59,9 +77,9 @@ export function ClassementTable({
                   <PodiumBadge rang={rang} />
                 </td>
                 <td className="py-3 px-4">
-                  <p className="font-medium text-gray-100 truncate max-w-[200px]">{equipeNom}</p>
+                  <p className="font-medium text-gray-100">{nom}</p>
                   {club && (
-                    <p className="text-xs text-dark-100 truncate max-w-[200px]">{club}</p>
+                    <p className="text-xs text-dark-100">{club}</p>
                   )}
                 </td>
                 <td className="py-3 px-4 text-center">

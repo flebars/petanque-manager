@@ -112,6 +112,19 @@ export interface Classement {
   equipe?: Equipe;
 }
 
+export interface ClassementJoueur {
+  id: string;
+  concoursId: string;
+  joueurId: string;
+  victoires: number;
+  defaites: number;
+  pointsMarques: number;
+  pointsEncaisses: number;
+  quotient: number;
+  rang?: number;
+  joueur: Joueur;
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;

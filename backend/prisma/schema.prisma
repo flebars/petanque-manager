@@ -90,6 +90,7 @@ model Joueur {
 
   equipeJoueurs  EquipeJoueur[]
   concoursOrganises Concours[] @relation("OrganisateurConcours")
+  classementsJoueur ClassementJoueur[]
 
   @@map("joueurs")
 }
@@ -118,6 +119,7 @@ model Concours {
   poules              Poule[]
   tiragesLog          TirageLog[]
   classements         Classement[]
+  classementsJoueurs  ClassementJoueur[]
 
   @@map("concours")
 }
@@ -235,6 +237,25 @@ model Classement {
 
   @@unique([concoursId, equipeId])
   @@map("classements")
+}
+
+model ClassementJoueur {
+  id               String   @id @default(uuid())
+  concoursId       String
+  joueurId         String
+  victoires        Int      @default(0)
+  defaites         Int      @default(0)
+  pointsMarques    Int      @default(0)
+  pointsEncaisses  Int      @default(0)
+  quotient         Float    @default(0)
+  rang             Int?
+  updatedAt        DateTime @updatedAt
+
+  concours  Concours @relation(fields: [concoursId], references: [id], onDelete: Cascade)
+  joueur    Joueur   @relation(fields: [joueurId], references: [id])
+
+  @@unique([concoursId, joueurId])
+  @@map("classements_joueurs")
 }
 
 model TirageLog {

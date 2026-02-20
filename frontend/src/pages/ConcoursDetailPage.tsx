@@ -319,7 +319,10 @@ export default function ConcoursDetailPage(): JSX.Element {
               <Spinner size="md" className="text-primary-500" />
             </div>
           ) : (
-            <ClassementTable classements={classements} />
+            <ClassementTable 
+              classements={classements} 
+              mode={concours.modeConstitution === 'MELEE_DEMELEE' ? 'joueur' : 'equipe'}
+            />
           )}
         </div>
       )}
