@@ -147,7 +147,7 @@ export default function ConcoursDetailPage(): JSX.Element {
   const isCurrentTour = tourActif === maxTour || tours.length === 0;
 
   return (
-    <div className="flex flex-col gap-0 max-w-6xl">
+    <div className="flex flex-col gap-0 w-full">
       <div className="flex items-start gap-3 mb-6 flex-wrap">
         <button
           onClick={() => navigate('/concours')}

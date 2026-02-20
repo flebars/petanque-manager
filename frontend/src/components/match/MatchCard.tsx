@@ -98,10 +98,10 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
 
         <div className="flex items-center gap-3 mt-3">
           <div className={cn('flex-1 min-w-0', aWon && 'text-success-400', !aWon && bWon && 'text-dark-50')}>
-            <p className={cn('font-medium text-sm truncate', !aWon && !bWon ? 'text-gray-100' : '')}>{nomA}</p>
+            <p className={cn('font-medium text-sm', !aWon && !bWon ? 'text-gray-100' : '')}>{nomA}</p>
             {equipeA?.joueurs && equipeA.joueurs.length > 0 && (
-              <p className="text-xs text-dark-100 truncate">
-                {equipeA.joueurs.map((ej) => ej.joueur.nom).join(', ')}
+              <p className="text-xs text-dark-100">
+                {equipeA.joueurs.map((ej) => `${ej.joueur.prenom} ${ej.joueur.nom}`).join(', ')}
               </p>
             )}
           </div>
@@ -127,10 +127,10 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
           </div>
 
           <div className={cn('flex-1 min-w-0 text-right', bWon && 'text-success-400', !bWon && aWon && 'text-dark-50')}>
-            <p className={cn('font-medium text-sm truncate', !aWon && !bWon ? 'text-gray-100' : '')}>{nomB}</p>
+            <p className={cn('font-medium text-sm', !aWon && !bWon ? 'text-gray-100' : '')}>{nomB}</p>
             {equipeB?.joueurs && equipeB.joueurs.length > 0 && (
-              <p className="text-xs text-dark-100 truncate">
-                {equipeB.joueurs.map((ej) => ej.joueur.nom).join(', ')}
+              <p className="text-xs text-dark-100">
+                {equipeB.joueurs.map((ej) => `${ej.joueur.prenom} ${ej.joueur.nom}`).join(', ')}
               </p>
             )}
           </div>
