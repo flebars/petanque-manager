@@ -400,7 +400,7 @@ function BracketMatchCard({ match, isFinale = false, preview = false }: BracketM
 
       {!preview && isReady && (
         <div className="text-center mt-1">
-          <Badge variant="success" size="sm">
+          <Badge variant="green" size="sm">
             Prêt à jouer
           </Badge>
         </div>

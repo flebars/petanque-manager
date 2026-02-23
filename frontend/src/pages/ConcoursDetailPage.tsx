@@ -37,6 +37,7 @@ import {
 } from '@/lib/utils';
 
 type Tab = 'inscriptions' | 'parties' | 'classement' | 'infos';
+type BracketTab = 'principale' | 'consolante';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'inscriptions', label: 'Inscriptions', icon: Users },
@@ -50,6 +51,7 @@ export default function ConcoursDetailPage(): JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('inscriptions');
+  const [activeBracketTab, setActiveBracketTab] = useState<BracketTab>('principale');
   const [tourActif, setTourActif] = useState(1);
   const [selectedBracketMatch, setSelectedBracketMatch] = useState<Partie | null>(null);
 
@@ -305,22 +307,70 @@ export default function ConcoursDetailPage(): JSX.Element {
                 </div>
               )}
 
-              {parties.some((p) => p.type === 'COUPE_PRINCIPALE') && (
-                <BracketView
-                  parties={parties.filter((p) => p.type === 'COUPE_PRINCIPALE')}
-                  type="COUPE_PRINCIPALE"
-                  onMatchClick={(match) => setSelectedBracketMatch(match)}
-                />
-              )}
-
-              {concours.params?.consolante && parties.some((p) => p.type === 'COUPE_CONSOLANTE') && (
+              {parties.length > 0 && (
                 <>
-                  <div className="border-t-2 border-dark-200 mt-8" />
-                  <BracketView
-                    parties={parties.filter((p) => p.type === 'COUPE_CONSOLANTE')}
-                    type="COUPE_CONSOLANTE"
-                    onMatchClick={(match) => setSelectedBracketMatch(match)}
-                  />
+                  {/* Bracket Sub-Tabs */}
+                  <div className="border-b border-dark-300">
+                    <nav className="flex gap-1 -mb-px">
+                      <button
+                        onClick={() => setActiveBracketTab('principale')}
+                        className={cn(
+                          'flex items-center gap-2 px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                          activeBracketTab === 'principale'
+                            ? 'border-primary-500 text-primary-500'
+                            : 'border-transparent text-dark-50 hover:text-gray-100 hover:border-dark-300',
+                        )}
+                      >
+                        🏆 Tableau Principal
+                        <span className="text-xs bg-dark-300 text-dark-50 rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                          {parties.filter((p) => p.type === 'COUPE_PRINCIPALE').length}
+                        </span>
+                      </button>
+                      
+                      {concours.params?.consolante && parties.some((p) => p.type === 'COUPE_CONSOLANTE') && (
+                        <button
+                          onClick={() => setActiveBracketTab('consolante')}
+                          className={cn(
+                            'flex items-center gap-2 px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                            activeBracketTab === 'consolante'
+                              ? 'border-primary-500 text-primary-500'
+                              : 'border-transparent text-dark-50 hover:text-gray-100 hover:border-dark-300',
+                          )}
+                        >
+                          🎖️ Consolante
+                          <span className="text-xs bg-dark-300 text-dark-50 rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                            {parties.filter((p) => p.type === 'COUPE_CONSOLANTE').length}
+                          </span>
+                        </button>
+                      )}
+                    </nav>
+                  </div>
+
+                  {/* Bracket Content */}
+                  {activeBracketTab === 'principale' && parties.some((p) => p.type === 'COUPE_PRINCIPALE') && (
+                    <BracketView
+                      parties={parties.filter((p) => p.type === 'COUPE_PRINCIPALE')}
+                      type="COUPE_PRINCIPALE"
+                      onMatchClick={(match) => setSelectedBracketMatch(match)}
+                    />
+                  )}
+
+                  {activeBracketTab === 'consolante' && (
+                    <>
+                      {parties.some((p) => p.type === 'COUPE_CONSOLANTE') ? (
+                        <BracketView
+                          parties={parties.filter((p) => p.type === 'COUPE_CONSOLANTE')}
+                          type="COUPE_CONSOLANTE"
+                          onMatchClick={(match) => setSelectedBracketMatch(match)}
+                        />
+                      ) : (
+                        <div className="text-center py-12 text-dark-100 bg-dark-400 rounded-lg border border-dashed border-dark-200">
+                          <p className="text-lg">Tableau Consolante</p>
+                          <p className="text-sm mt-2">Sera créé automatiquement avec les perdants du premier tour</p>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </>
               )}
 
