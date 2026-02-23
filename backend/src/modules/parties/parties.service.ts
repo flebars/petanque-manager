@@ -199,6 +199,9 @@ export class PartiesService {
         },
       });
       if (!concours) throw new NotFoundException('Concours introuvable');
+      if (concours.statut !== 'EN_COURS') {
+        throw new BadRequestException('Le concours doit être démarré avant de lancer un tour');
+      }
 
       const { tirageMelee: tirageFn, constituerEquipesMelee: constituerFn } = await import(
         '@/modules/tirage/tirage.service'
@@ -381,6 +384,9 @@ export class PartiesService {
       if (!concours) throw new NotFoundException('Concours introuvable');
       if (concours.format !== 'COUPE') {
         throw new BadRequestException('Ce concours n\'est pas en format COUPE');
+      }
+      if (concours.statut !== 'EN_COURS') {
+        throw new BadRequestException('Le concours doit être démarré avant de lancer le bracket');
       }
 
       const existingMatches = await this.prisma.partie.findMany({
