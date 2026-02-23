@@ -195,7 +195,7 @@ export class CoupeService {
       where: {
         concoursId,
         statut: { in: [StatutEquipe.INSCRITE, StatutEquipe.PRESENTE] },
-        nom: { notIn: ['__BYE__', '__TBD__'] },
+        OR: [{ nom: null }, { nom: { notIn: ['__BYE__', '__TBD__'] } }],
       },
     });
 

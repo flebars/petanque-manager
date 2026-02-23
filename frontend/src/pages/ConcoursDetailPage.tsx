@@ -13,6 +13,7 @@ import {
   Tv,
   Trash2,
   Shuffle,
+  Trophy,
 } from 'lucide-react';
 import { concoursApi } from '@/api/concours';
 import { partiesApi } from '@/api/parties';
@@ -26,6 +27,7 @@ import { TourPanel } from '@/components/match/TourPanel';
 import { BracketView } from '@/components/match/BracketView';
 import { ScoreForm } from '@/components/match/ScoreForm';
 import { ClassementTable } from '@/components/classement/ClassementTable';
+import { CoupePodiumsTab } from '@/components/match/CoupePodiumsTab';
 import { useSocket } from '@/hooks/useSocket';
 import {
   FORMAT_LABELS,
@@ -36,13 +38,21 @@ import {
   nomEquipe,
 } from '@/lib/utils';
 
-type Tab = 'inscriptions' | 'parties' | 'classement' | 'infos';
+type Tab = 'inscriptions' | 'parties' | 'classement' | 'podiums' | 'infos';
 type BracketTab = 'principale' | 'consolante';
 
-const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+const MELEE_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'inscriptions', label: 'Inscriptions', icon: Users },
   { id: 'parties', label: 'Parties', icon: PlayCircle },
   { id: 'classement', label: 'Classement', icon: BarChart2 },
+  { id: 'infos', label: 'Infos', icon: Info },
+];
+
+const COUPE_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: 'inscriptions', label: 'Inscriptions', icon: Users },
+  { id: 'parties', label: 'Parties', icon: PlayCircle },
+  { id: 'podiums', label: 'Podiums', icon: Trophy },
+  { id: 'classement', label: 'Statistiques', icon: BarChart2 },
   { id: 'infos', label: 'Infos', icon: Info },
 ];
 
@@ -61,10 +71,12 @@ export default function ConcoursDetailPage(): JSX.Element {
     enabled: !!id,
   });
 
+  const isCoupe = concours?.format === 'COUPE';
+
   const { data: parties = [], isLoading: loadingParties } = useQuery<Partie[]>({
     queryKey: ['parties', id],
     queryFn: () => partiesApi.listByConcours(id!),
-    enabled: !!id && activeTab === 'parties',
+    enabled: !!id && (activeTab === 'parties' || activeTab === 'podiums'),
   });
 
   const { data: classements = [], isLoading: loadingClassement } = useQuery({
@@ -107,7 +119,7 @@ export default function ConcoursDetailPage(): JSX.Element {
       queryClient.invalidateQueries({ queryKey: ['concours', id] });
       queryClient.invalidateQueries({ queryKey: ['concours'] });
       toast.success('Concours terminé');
-      setActiveTab('classement');
+      setActiveTab(isCoupe ? 'podiums' : 'classement');
     },
     onError: () => toast.error('Impossible de terminer le concours'),
   });
@@ -153,7 +165,6 @@ export default function ConcoursDetailPage(): JSX.Element {
 
   const nbToursConfig = concours?.params?.nbTours ?? 0;
   
-  // Generate all configured tours (1 to nbToursConfig), or only existing tours if nbTours not set
   const allTours = useMemo(() => {
     if (nbToursConfig > 0) {
       return Array.from({ length: nbToursConfig }, (_, i) => i + 1);
@@ -180,8 +191,10 @@ export default function ConcoursDetailPage(): JSX.Element {
     );
   }
 
+  const TABS = isCoupe ? COUPE_TABS : MELEE_TABS;
   const partiesDuTour = parties.filter((p) => p.tour === tourActif);
   const isCurrentTour = tourActif === maxTour || tours.length === 0;
+  const hasConsolante = !!concours.params?.consolante;
 
   return (
     <div className="flex flex-col gap-0 w-full">
@@ -461,6 +474,18 @@ export default function ConcoursDetailPage(): JSX.Element {
                 readonly={concours.statut === 'TERMINE'}
               />
             </>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'podiums' && isCoupe && (
+        <div className="flex flex-col gap-4">
+          {loadingParties ? (
+            <div className="flex justify-center py-10">
+              <Spinner size="md" className="text-primary-500" />
+            </div>
+          ) : (
+            <CoupePodiumsTab parties={parties} hasConsolante={hasConsolante} />
           )}
         </div>
       )}

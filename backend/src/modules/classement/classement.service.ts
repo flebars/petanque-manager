@@ -28,7 +28,9 @@ export class ClassementService {
     return this.prisma.classement.findMany({
       where: {
         concoursId,
-        equipe: { nom: { notIn: ['__TBD__', '__BYE__'] } },
+        equipe: {
+          OR: [{ nom: null }, { nom: { notIn: ['__TBD__', '__BYE__'] } }],
+        },
       },
       include: { equipe: { include: { joueurs: { include: { joueur: true } } } } },
       orderBy: [
@@ -196,7 +198,9 @@ export class ClassementService {
     const classements = await this.prisma.classement.findMany({
       where: {
         concoursId,
-        equipe: { nom: { notIn: ['__TBD__', '__BYE__'] } },
+        equipe: {
+          OR: [{ nom: null }, { nom: { notIn: ['__TBD__', '__BYE__'] } }],
+        },
       },
       orderBy: [
         { victoires: 'desc' },
