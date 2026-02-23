@@ -55,8 +55,8 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
 
   const isWaitingForTeams = partie.statut === 'A_MONTER';
 
-  const nomA = nomEquipe(equipeA);
-  const nomB = nomEquipe(equipeB);
+  const nomA = nomEquipe(equipeA ?? {});
+  const nomB = nomEquipe(equipeB ?? {});
 
   const hasScore = partie.scoreA !== null && partie.scoreA !== undefined && partie.scoreB !== null && partie.scoreB !== undefined;
   const aWon = hasScore && (partie.scoreA ?? 0) === 13;
