@@ -10,6 +10,7 @@ import { PartiesModule } from './modules/parties/parties.module';
 import { ClassementModule } from './modules/classement/classement.module';
 import { PdfModule } from './modules/pdf/pdf.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -25,5 +26,6 @@ import { GatewayModule } from './modules/gateway/gateway.module';
     PdfModule,
     GatewayModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}
