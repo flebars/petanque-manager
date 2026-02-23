@@ -29,4 +29,9 @@ export const partiesApi = {
     api
       .post<Partie[]>(`/parties/concours/${concoursId}/tour/${tour}/lancer`)
       .then((r) => r.data),
+
+  lancerTourCoupe: (concoursId: string, tour: number): Promise<Partie[]> =>
+    api
+      .post<Partie[]>(`/parties/concours/${concoursId}/tour/${tour}/lancer-coupe`)
+      .then((r) => r.data),
 };

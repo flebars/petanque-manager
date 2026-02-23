@@ -32,7 +32,9 @@ export function ConcoursCard({ concours }: ConcoursCardProps): JSX.Element {
           </span>
           <span className="flex items-center gap-1.5">
             <Users size={13} />
-            {concours.equipes?.length ?? 0} équipe{(concours.equipes?.length ?? 0) !== 1 ? 's' : ''}
+            {concours.modeConstitution === 'MELEE_DEMELEE'
+              ? `${concours.equipes?.length ?? 0} joueur${(concours.equipes?.length ?? 0) !== 1 ? 's' : ''}`
+              : `${concours.equipes?.length ?? 0} équipe${(concours.equipes?.length ?? 0) !== 1 ? 's' : ''}`}
           </span>
         </div>
 

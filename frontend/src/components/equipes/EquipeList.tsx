@@ -43,15 +43,17 @@ export function EquipeList({ concours }: EquipeListProps): JSX.Element {
 
   const isMeleeMode =
     concours.modeConstitution === 'MELEE' || concours.modeConstitution === 'MELEE_DEMELEE';
+  
+  const isMeleeDemelee = concours.modeConstitution === 'MELEE_DEMELEE';
 
   const { data: equipes = [], isLoading } = useQuery<Equipe[]>({
     queryKey: ['equipes', concours.id],
     queryFn: () => equipesApi.listByConcours(concours.id),
   });
 
-  // After team constitution (demarrer), mêlée equipes have multiple players.
-  // Switch to the team view so all players are visible.
-  const teamsAreFormed = isMeleeMode && equipes.some((e) => e.joueurs.length > 1);
+  // For MELEE_DEMELEE, always show individual players (teams are ephemeral per round)
+  // For MELEE, show players until teams are formed, then show teams
+  const showPlayers = isMeleeDemelee || (isMeleeMode && equipes.some((e) => e.joueurs.length === 1));
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => equipesApi.remove(id),
@@ -109,7 +111,7 @@ export function EquipeList({ concours }: EquipeListProps): JSX.Element {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex flex-col gap-0.5">
           <p className="text-sm text-dark-50">
-            {isMeleeMode && !teamsAreFormed ? (
+            {showPlayers ? (
               <>
                 {equipes.length} joueur{equipes.length !== 1 ? 's' : ''} inscrit{equipes.length !== 1 ? 's' : ''}
                 {concours.maxParticipants ? ` / ${concours.maxParticipants} max` : ''}
@@ -159,7 +161,7 @@ export function EquipeList({ concours }: EquipeListProps): JSX.Element {
             <p>Aucune équipe inscrite pour l'instant.</p>
           )}
         </div>
-      ) : isMeleeMode && !teamsAreFormed ? (
+      ) : showPlayers ? (
         <JoueurTable
           equipes={equipes}
           canEdit={canEdit}

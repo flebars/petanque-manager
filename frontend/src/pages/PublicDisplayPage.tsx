@@ -148,7 +148,10 @@ export default function PublicDisplayPage(): JSX.Element {
 
         {view === 'classement' && (
           <div className="px-4 py-5">
-            <ClassementTable classements={classements} />
+            <ClassementTable 
+              classements={classements} 
+              mode={concours.modeConstitution === 'MELEE_DEMELEE' ? 'joueur' : 'equipe'}
+            />
           </div>
         )}
       </div>

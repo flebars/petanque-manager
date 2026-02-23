@@ -39,6 +39,7 @@ export interface Equipe {
   concoursId: string;
   nom?: string;
   numeroTirage?: number;
+  tour?: number;
   statut: StatutEquipe;
   joueurs: EquipeJoueur[];
   createdAt: string;

@@ -12,6 +12,7 @@ import {
   CheckCircle,
   Tv,
   Trash2,
+  Shuffle,
 } from 'lucide-react';
 import { concoursApi } from '@/api/concours';
 import { partiesApi } from '@/api/parties';
@@ -22,6 +23,8 @@ import { Button } from '@/components/common/Button';
 import { ConcoursStatusBadge } from '@/components/concours/ConcoursStatusBadge';
 import { EquipeList } from '@/components/equipes/EquipeList';
 import { TourPanel } from '@/components/match/TourPanel';
+import { BracketView } from '@/components/match/BracketView';
+import { ScoreForm } from '@/components/match/ScoreForm';
 import { ClassementTable } from '@/components/classement/ClassementTable';
 import { useSocket } from '@/hooks/useSocket';
 import {
@@ -30,6 +33,7 @@ import {
   MODE_CONSTITUTION_LABELS,
   formatDate,
   cn,
+  nomEquipe,
 } from '@/lib/utils';
 
 type Tab = 'inscriptions' | 'parties' | 'classement' | 'infos';
@@ -47,6 +51,7 @@ export default function ConcoursDetailPage(): JSX.Element {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('inscriptions');
   const [tourActif, setTourActif] = useState(1);
+  const [selectedBracketMatch, setSelectedBracketMatch] = useState<Partie | null>(null);
 
   const { data: concours, isLoading: loadingConcours } = useQuery<Concours>({
     queryKey: ['concours', id],
@@ -103,6 +108,30 @@ export default function ConcoursDetailPage(): JSX.Element {
       setActiveTab('classement');
     },
     onError: () => toast.error('Impossible de terminer le concours'),
+  });
+
+  const lancerNextTourMutation = useMutation({
+    mutationFn: () => partiesApi.lancerTourMelee(id!, nextTour),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parties', id] });
+      queryClient.invalidateQueries({ queryKey: ['classement', id] });
+      toast.success(`Tour ${nextTour} lancé`);
+      setTourActif(nextTour);
+    },
+    onError: () => toast.error(`Impossible de lancer le tour ${nextTour}`),
+  });
+
+  const lancerTourCoupeMutation = useMutation({
+    mutationFn: (tour: number) => partiesApi.lancerTourCoupe(id!, tour),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parties', id] });
+      queryClient.invalidateQueries({ queryKey: ['classement', id] });
+      queryClient.invalidateQueries({ queryKey: ['concours', id] });
+      toast.success('Tableau lancé avec succès');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erreur lors du lancement du tableau');
+    },
   });
 
   const deleteMutation = useMutation({
@@ -255,7 +284,55 @@ export default function ConcoursDetailPage(): JSX.Element {
             <div className="flex justify-center py-10">
               <Spinner size="md" className="text-primary-500" />
             </div>
+          ) : concours.format === 'COUPE' ? (
+            <div className="space-y-6">
+              {concours.statut === 'EN_COURS' && parties.length === 0 && (
+                <div className="flex justify-between items-center bg-dark-400 p-4 rounded-lg">
+                  <div>
+                    <h2 className="text-xl font-semibold">Lancer le Tableau Principal</h2>
+                    <p className="text-sm text-dark-100 mt-1">
+                      Créer le bracket d'élimination avec toutes les équipes inscrites
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={() => lancerTourCoupeMutation.mutate(1)}
+                    loading={lancerTourCoupeMutation.isPending}
+                    size="lg"
+                  >
+                    Lancer Tableau
+                  </Button>
+                </div>
+              )}
+
+              {parties.some((p) => p.type === 'COUPE_PRINCIPALE') && (
+                <BracketView
+                  parties={parties.filter((p) => p.type === 'COUPE_PRINCIPALE')}
+                  type="COUPE_PRINCIPALE"
+                  onMatchClick={(match) => setSelectedBracketMatch(match)}
+                />
+              )}
+
+              {concours.params?.consolante && parties.some((p) => p.type === 'COUPE_CONSOLANTE') && (
+                <>
+                  <div className="border-t-2 border-dark-200 mt-8" />
+                  <BracketView
+                    parties={parties.filter((p) => p.type === 'COUPE_CONSOLANTE')}
+                    type="COUPE_CONSOLANTE"
+                    onMatchClick={(match) => setSelectedBracketMatch(match)}
+                  />
+                </>
+              )}
+
+              {parties.length === 0 && (
+                <div className="text-center py-16 text-dark-100">
+                  <p className="text-lg">Aucun tableau lancé</p>
+                  <p className="text-sm mt-2">Cliquez sur "Lancer Tableau" pour démarrer le concours</p>
+                </div>
+              )}
+            </div>
           ) : (
+            // MELEE format: Existing tour panel
             <>
               {allTours.length > 0 && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-2">
@@ -263,9 +340,13 @@ export default function ConcoursDetailPage(): JSX.Element {
                     {allTours.map((t) => {
                       const tourLaunched = tours.includes(t);
                       const partiesTour = parties.filter((p) => p.tour === t);
-                      const isComplete = tourLaunched && partiesTour.length > 0 && partiesTour.every((p) => p.statut === 'TERMINEE' || p.statut === 'FORFAIT');
-                      const isInProgress = tourLaunched && partiesTour.some((p) => p.statut === 'EN_COURS' || p.statut === 'A_JOUER');
-                      
+                      const isComplete =
+                        tourLaunched &&
+                        partiesTour.length > 0 &&
+                        partiesTour.every((p) => p.statut === 'TERMINEE' || p.statut === 'FORFAIT');
+                      const isInProgress =
+                        tourLaunched && partiesTour.some((p) => p.statut === 'EN_COURS' || p.statut === 'A_JOUER');
+
                       return (
                         <button
                           key={t}
@@ -295,6 +376,26 @@ export default function ConcoursDetailPage(): JSX.Element {
                   </div>
                 </div>
               )}
+
+              {partiesDuTour.length > 0 &&
+                partiesDuTour.every((p) => p.statut === 'TERMINEE' || p.statut === 'FORFAIT') &&
+                canLancerNext &&
+                isCurrentTour &&
+                tourActif !== nextTour &&
+                concours.statut !== 'TERMINE' && (
+                  <div className="rounded-xl border border-dashed border-success-500/30 bg-success-500/5 p-6 text-center">
+                    <p className="text-sm text-dark-50 mb-4">
+                      Toutes les parties du tour {tourActif} sont terminées
+                    </p>
+                    <Button
+                      onClick={() => lancerNextTourMutation.mutate()}
+                      loading={lancerNextTourMutation.isPending}
+                      variant="success"
+                    >
+                      <Shuffle size={15} /> Lancer le tour {nextTour}
+                    </Button>
+                  </div>
+                )}
 
               <TourPanel
                 concoursId={id!}
@@ -367,6 +468,22 @@ export default function ConcoursDetailPage(): JSX.Element {
             </dl>
           </div>
         </div>
+      )}
+      
+      {/* Score Form Modal for Bracket Matches */}
+      {selectedBracketMatch && (
+        <ScoreForm
+          open={!!selectedBracketMatch}
+          onClose={() => setSelectedBracketMatch(null)}
+          partie={selectedBracketMatch}
+          equipeANom={selectedBracketMatch.equipeA ? nomEquipe(selectedBracketMatch.equipeA) : '—'}
+          equipeBNom={selectedBracketMatch.equipeB ? nomEquipe(selectedBracketMatch.equipeB) : '—'}
+          onSuccess={() => {
+            setSelectedBracketMatch(null);
+            queryClient.invalidateQueries({ queryKey: ['parties', id] });
+            queryClient.invalidateQueries({ queryKey: ['classement', id] });
+          }}
+        />
       )}
     </div>
   );
