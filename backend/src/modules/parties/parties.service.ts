@@ -351,12 +351,13 @@ export class PartiesService {
       for (let i = 0; i < result.appariements.length; i++) {
         const app = result.appariements[i];
         if (app.isBye) {
+          const byeTeamId = await this.coupeService.getOrCreateByeTeamPublic(concoursId);
           const byePartie = await this.prisma.partie.create({
             data: {
               concoursId,
               tour,
               equipeAId: app.equipeAId,
-              equipeBId: app.equipeAId,
+              equipeBId: byeTeamId,
               scoreA: 13,
               scoreB: 0,
               statut: StatutPartie.TERMINEE,

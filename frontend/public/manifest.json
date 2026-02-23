@@ -1,0 +1,22 @@
+{
+  "name": "Pétanque Manager",
+  "short_name": "Pétanque",
+  "description": "Gestion de tournois de pétanque - FFPJP",
+  "theme_color": "#0F1923",
+  "background_color": "#0F1923",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon-32x32.svg",
+      "sizes": "32x32",
+      "type": "image/svg+xml"
+    }
+  ]
+}

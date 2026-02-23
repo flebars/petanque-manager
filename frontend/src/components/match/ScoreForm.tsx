@@ -89,53 +89,53 @@ export function ScoreForm({
       size="sm"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 flex flex-col items-center gap-2">
+        <div className="flex items-center justify-center gap-4">
+          <div className="flex flex-col items-center gap-2 w-28">
             <span
               className={cn(
-                'text-sm font-medium truncate max-w-full text-center',
+                'w-full text-sm font-medium text-center leading-tight line-clamp-2',
                 aWins ? 'text-success-500' : 'text-gray-100',
               )}
+              title={equipeANom}
             >
               {equipeANom}
             </span>
             <input
-              type="number"
-              min={0}
-              max={13}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={2}
               placeholder="0"
               {...register('scoreA')}
               className={cn(
                 'w-20 h-20 text-center font-barlow-condensed font-bold text-5xl rounded-xl border bg-dark-500 focus:outline-none focus:ring-2 focus:ring-primary-500 tabular-nums transition-colors',
-                aWins
-                  ? 'border-success-500 text-success-500'
-                  : 'border-dark-300 text-gray-100',
+                aWins ? 'border-success-500 text-success-500' : 'border-dark-300 text-gray-100',
               )}
             />
           </div>
 
-          <span className="text-dark-100 text-2xl font-light mb-6">–</span>
+          <span className="text-dark-100 text-2xl font-light self-end mb-5">–</span>
 
-          <div className="flex-1 flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-2 w-28">
             <span
               className={cn(
-                'text-sm font-medium truncate max-w-full text-center',
+                'w-full text-sm font-medium text-center leading-tight line-clamp-2',
                 bWins ? 'text-success-500' : 'text-gray-100',
               )}
+              title={equipeBNom}
             >
               {equipeBNom}
             </span>
             <input
-              type="number"
-              min={0}
-              max={13}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={2}
               placeholder="0"
               {...register('scoreB')}
               className={cn(
                 'w-20 h-20 text-center font-barlow-condensed font-bold text-5xl rounded-xl border bg-dark-500 focus:outline-none focus:ring-2 focus:ring-primary-500 tabular-nums transition-colors',
-                bWins
-                  ? 'border-success-500 text-success-500'
-                  : 'border-dark-300 text-gray-100',
+                bWins ? 'border-success-500 text-success-500' : 'border-dark-300 text-gray-100',
               )}
             />
           </div>

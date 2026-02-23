@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="ballGradient" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#E8EDF2;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#7A9BB5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4A5F7A;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Background circle (dark) -->
+  <circle cx="64" cy="64" r="64" fill="#0F1923"/>
+  
+  <!-- Pétanque ball -->
+  <circle cx="64" cy="64" r="45" fill="url(#ballGradient)"/>
+  
+  <!-- Ball grooves/lines for texture -->
+  <path d="M 64 19 Q 45 35, 35 55 T 35 85 Q 45 100, 64 109" 
+        fill="none" stroke="#4A5F7A" stroke-width="1.5" opacity="0.4"/>
+  <path d="M 64 19 Q 83 35, 93 55 T 93 85 Q 83 100, 64 109" 
+        fill="none" stroke="#4A5F7A" stroke-width="1.5" opacity="0.4"/>
+  
+  <!-- Highlight shine -->
+  <ellipse cx="52" cy="48" rx="18" ry="12" fill="#ffffff" opacity="0.3"/>
+  <ellipse cx="48" cy="44" rx="10" ry="6" fill="#ffffff" opacity="0.5"/>
+</svg>

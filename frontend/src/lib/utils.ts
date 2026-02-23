@@ -5,7 +5,29 @@ export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Check if a team is a TBD placeholder
+ */
+export function isTbdTeam(equipe: { nom?: string | null } | null | undefined): boolean {
+  return equipe?.nom === '__TBD__';
+}
+
+/**
+ * Check if a team is a BYE placeholder
+ */
+export function isByeTeam(equipe: { nom?: string | null } | null | undefined): boolean {
+  return equipe?.nom === '__BYE__';
+}
+
+/**
+ * Get team display name
+ * - Returns 'À déterminer' for TBD placeholder teams
+ * - Returns 'Bye' for BYE placeholder teams
+ * - Returns team name or player names for real teams
+ */
 export function nomEquipe(equipe: { nom?: string | null; joueurs?: Array<{ joueur: { nom: string; prenom: string } }> }): string {
+  if (isTbdTeam(equipe)) return 'À déterminer';
+  if (isByeTeam(equipe)) return 'Bye';
   if (equipe.nom) return equipe.nom;
   if (!equipe.joueurs || equipe.joueurs.length === 0) return 'Équipe inconnue';
   return equipe.joueurs.map((j) => `${j.joueur.prenom} ${j.joueur.nom}`).join(' / ');
@@ -49,6 +71,7 @@ export const STATUT_CONCOURS_LABELS: Record<string, string> = {
 };
 
 export const STATUT_PARTIE_LABELS: Record<string, string> = {
+  A_MONTER: 'En attente',
   A_JOUER: 'À jouer',
   EN_COURS: 'En cours',
   TERMINEE: 'Terminée',

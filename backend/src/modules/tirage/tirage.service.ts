@@ -158,14 +158,32 @@ export function generateBracket(
   const rng = seededRng(seed);
   const shuffled = shuffleArray(equipeIds, rng);
   const size = nextPowerOfTwo(shuffled.length);
-  const slots: BracketSlot[] = [];
+  const numByes = size - shuffled.length;
 
+  if (numByes === 0) {
+    return shuffled.map((id, i) => ({ position: i, equipeId: id, isBye: false }));
+  }
+
+  // Distribute byes evenly so no two byes are adjacent.
+  // Strategy: divide the bracket into `numByes` equal bands and place one bye
+  // near the centre of each band. The band width is `size / numByes` which is
+  // always ≥ 2 (since numByes ≤ size/2 for any valid bracket), so consecutive
+  // bye positions are guaranteed to differ by at least 2.
+  const bandSize = size / numByes;
+  const byeSet = new Set<number>();
+  for (let i = 0; i < numByes; i++) {
+    const pos = Math.round(i * bandSize + (bandSize - 1) / 2);
+    byeSet.add(Math.min(pos, size - 1));
+  }
+
+  const slots: BracketSlot[] = [];
+  let teamIndex = 0;
   for (let i = 0; i < size; i++) {
-    slots.push({
-      position: i,
-      equipeId: shuffled[i] ?? null,
-      isBye: shuffled[i] === undefined,
-    });
+    if (byeSet.has(i)) {
+      slots.push({ position: i, equipeId: null, isBye: true });
+    } else {
+      slots.push({ position: i, equipeId: shuffled[teamIndex++], isBye: false });
+    }
   }
 
   return slots;

@@ -58,6 +58,7 @@ enum StatutEquipe {
 }
 
 enum StatutPartie {
+  A_MONTER
   A_JOUER
   EN_COURS
   TERMINEE
@@ -217,7 +218,8 @@ model Partie {
   equipeB   Equipe    @relation("PartieEquipeB", fields: [equipeBId], references: [id])
   terrain   Terrain?  @relation(fields: [terrainId], references: [id])
 
-  @@unique([concoursId, tour, equipeAId, equipeBId])
+  // Note: Unique constraint removed to allow bracket matches with tour=null
+  // and to permit same teams to play in different bracket rounds
   @@map("parties")
 }
 

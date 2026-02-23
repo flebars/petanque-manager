@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { MapPin, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { Partie } from '@/types';
-import { nomEquipe, isTbdTeam } from '@/lib/utils';
+import { nomEquipe, isTbdTeam, isByeTeam } from '@/lib/utils';
 import { Badge } from '@/components/common/Badge';
 import { Button } from '@/components/common/Button';
 import { cn } from '@/lib/utils';
@@ -340,8 +340,8 @@ function BracketMatchCard({ match, concoursId, isFinale = false, preview = false
     onError: () => toast.error('Impossible de démarrer la partie'),
   });
 
-  // Check if it's a real bye match (same team ID, not TBD placeholders)
-  const isBye = match.equipeAId === match.equipeBId && !isTbdTeam(equipeA);
+  // Check if it's a bye match (equipeB is the __BYE__ placeholder)
+  const isBye = isByeTeam(equipeB) || (equipeA && isByeTeam(equipeA));
   
   // Check if both teams are TBD (waiting for both teams)
   const bothTbd = isTbdTeam(equipeA) && isTbdTeam(equipeB);
@@ -365,7 +365,7 @@ function BracketMatchCard({ match, concoursId, isFinale = false, preview = false
   
   const hasTeamA = equipeA && equipeA.id && !isTbdTeam(equipeA);
   const hasTeamB = equipeB && equipeB.id && !isTbdTeam(equipeB);
-  const hasBothRealTeams = hasTeamA && hasTeamB;
+  const hasBothRealTeams = hasTeamA && hasTeamB && !isBye;
 
   return (
     <div className="space-y-1">
@@ -401,7 +401,7 @@ function BracketMatchCard({ match, concoursId, isFinale = false, preview = false
       {isBye ? (
         <div className="text-center py-2">
           <div className={cn("bracket-team", preview ? "" : "bracket-team-winner")}>
-            <span className="bracket-team-name">{nomEquipe(equipeA!)}</span>
+            <span className="bracket-team-name">{isByeTeam(equipeA!) ? nomEquipe(equipeB!) : nomEquipe(equipeA!)}</span>
             {!preview && (
               <Badge variant="green" size="sm">
                 Bye
@@ -412,22 +412,22 @@ function BracketMatchCard({ match, concoursId, isFinale = false, preview = false
       ) : bothTbd ? (
         <>
           <div className="bracket-team bracket-team-placeholder">
-            <span className="bracket-team-name text-dark-200 italic">À déterminer</span>
+            <span className="bracket-team-name text-light-200 italic">À déterminer</span>
             <span className="bracket-team-score text-dark-300">-</span>
           </div>
           <div className="bracket-team bracket-team-placeholder">
-            <span className="bracket-team-name text-dark-200 italic">À déterminer</span>
+            <span className="bracket-team-name text-light-200 italic">À déterminer</span>
             <span className="bracket-team-score text-dark-300">-</span>
           </div>
         </>
       ) : isPlaceholder ? (
         <>
-          <div className="bracket-team">
-            <span className="bracket-team-name">{nomEquipe(equipeA!)}</span>
+          <div className={cn('bracket-team', !hasTeamA && 'bracket-team-placeholder')}>
+            <span className="bracket-team-name">{hasTeamA ? nomEquipe(equipeA!) : <span className="text-light-200 italic">En attente de l'adversaire</span>}</span>
             <span className="bracket-team-score">-</span>
           </div>
-          <div className="bracket-team bracket-team-placeholder">
-            <span className="bracket-team-name text-dark-200 italic">En attente de l'adversaire</span>
+          <div className={cn('bracket-team', !hasTeamB && 'bracket-team-placeholder')}>
+            <span className="bracket-team-name">{hasTeamB ? nomEquipe(equipeB!) : <span className="text-light-200 italic">En attente de l'adversaire</span>}</span>
             <span className="bracket-team-score text-dark-300">-</span>
           </div>
         </>
@@ -435,7 +435,7 @@ function BracketMatchCard({ match, concoursId, isFinale = false, preview = false
         <>
           <div className={cn('bracket-team', winner === 'A' && !preview && 'bracket-team-winner')}>
             <span className="bracket-team-name">
-              {hasTeamA ? nomEquipe(equipeA!) : <span className="text-dark-200 italic">À déterminer</span>}
+              {hasTeamA ? nomEquipe(equipeA!) : <span className="text-light-200 italic">En attente de l'adversaire</span>}
             </span>
             <span className="bracket-team-score">{preview ? '-' : (scoreA ?? '-')}</span>
           </div>

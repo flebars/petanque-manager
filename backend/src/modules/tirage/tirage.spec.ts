@@ -172,6 +172,27 @@ describe('generateBracket', () => {
     const r2 = generateBracket(ids, 'x');
     expect(r1).toEqual(r2);
   });
+
+  it('never places two byes in adjacent positions', () => {
+    const cases = [
+      ['A', 'B', 'C'],                                          // 3 teams → 8 slots, 5 byes
+      ['A', 'B', 'C', 'D', 'E'],                               // 5 teams → 8 slots, 3 byes
+      ['A', 'B', 'C', 'D', 'E', 'F'],                          // 6 teams → 8 slots, 2 byes
+      ['A', 'B', 'C', 'D', 'E', 'F', 'G'],                     // 7 teams → 8 slots, 1 bye
+      Array.from({ length: 9 }, (_, i) => String(i)),           // 9 teams → 16 slots, 7 byes
+      Array.from({ length: 13 }, (_, i) => String(i)),          // 13 teams → 16 slots, 3 byes
+    ];
+    for (const ids of cases) {
+      const slots = generateBracket(ids, 'seed');
+      for (let i = 0; i < slots.length - 1; i++) {
+        if (slots[i].isBye && slots[i + 1].isBye) {
+          throw new Error(
+            `Adjacent byes at positions ${i} and ${i + 1} for ${ids.length} teams`,
+          );
+        }
+      }
+    }
+  });
 });
 
 describe('generatePoolAssignments', () => {

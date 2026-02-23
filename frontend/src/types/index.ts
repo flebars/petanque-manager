@@ -6,7 +6,7 @@ export type TypeEquipe = 'TETE_A_TETE' | 'DOUBLETTE' | 'TRIPLETTE';
 export type ModeConstitution = 'MELEE_DEMELEE' | 'MELEE' | 'MONTEE';
 export type StatutConcours = 'INSCRIPTION' | 'EN_COURS' | 'TERMINE';
 export type StatutEquipe = 'INSCRITE' | 'PRESENTE' | 'FORFAIT' | 'DISQUALIFIEE';
-export type StatutPartie = 'A_JOUER' | 'EN_COURS' | 'TERMINEE' | 'LITIGE' | 'FORFAIT';
+export type StatutPartie = 'A_MONTER' | 'A_JOUER' | 'EN_COURS' | 'TERMINEE' | 'LITIGE' | 'FORFAIT';
 export type TypePartie =
   | 'MELEE'
   | 'COUPE_PRINCIPALE'

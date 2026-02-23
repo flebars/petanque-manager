@@ -9,7 +9,7 @@ import { Button } from '@/components/common/Button';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import { ScoreForm } from './ScoreForm';
 import { LitigeForm } from './LitigeForm';
-import { nomEquipe, STATUT_PARTIE_LABELS } from '@/lib/utils';
+import { nomEquipe, isTbdTeam, isByeTeam, STATUT_PARTIE_LABELS } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 interface MatchCardProps {
@@ -19,6 +19,7 @@ interface MatchCardProps {
 }
 
 const STATUT_BADGE_VARIANT = {
+  A_MONTER: 'gray',
   A_JOUER: 'gray',
   EN_COURS: 'orange',
   TERMINEE: 'green',
@@ -51,8 +52,11 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
 
   const equipeA = partie.equipeA;
   const equipeB = partie.equipeB;
-  const nomA = equipeA ? nomEquipe(equipeA) : '—';
-  const nomB = equipeB ? nomEquipe(equipeB) : '—';
+
+  const isWaitingForTeams = partie.statut === 'A_MONTER';
+
+  const nomA = nomEquipe(equipeA);
+  const nomB = nomEquipe(equipeB);
 
   const hasScore = partie.scoreA !== null && partie.scoreA !== undefined && partie.scoreB !== null && partie.scoreB !== undefined;
   const aWon = hasScore && (partie.scoreA ?? 0) === 13;
@@ -99,7 +103,7 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
         <div className="flex items-center gap-3 mt-3">
           <div className={cn('flex-1 min-w-0', aWon && 'text-success-400', !aWon && bWon && 'text-dark-50')}>
             <p className={cn('font-medium text-sm', !aWon && !bWon ? 'text-gray-100' : '')}>{nomA}</p>
-            {equipeA?.joueurs && equipeA.joueurs.length > 0 && (
+            {equipeA?.joueurs && equipeA.joueurs.length > 0 && !isTbdTeam(equipeA) && !isByeTeam(equipeA) && (
               <p className="text-xs text-dark-100">
                 {equipeA.joueurs.map((ej) => `${ej.joueur.prenom} ${ej.joueur.nom}`).join(', ')}
               </p>
@@ -128,7 +132,7 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
 
           <div className={cn('flex-1 min-w-0 text-right', bWon && 'text-success-400', !bWon && aWon && 'text-dark-50')}>
             <p className={cn('font-medium text-sm', !aWon && !bWon ? 'text-gray-100' : '')}>{nomB}</p>
-            {equipeB?.joueurs && equipeB.joueurs.length > 0 && (
+            {equipeB?.joueurs && equipeB.joueurs.length > 0 && !isTbdTeam(equipeB) && !isByeTeam(equipeB) && (
               <p className="text-xs text-dark-100">
                 {equipeB.joueurs.map((ej) => `${ej.joueur.prenom} ${ej.joueur.nom}`).join(', ')}
               </p>
@@ -145,7 +149,13 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
           </div>
         )}
 
-        {!readonly && !isDone && (
+        {isWaitingForTeams && (
+          <div className="mt-3 p-2 bg-dark-400 rounded text-xs text-dark-50 italic text-center">
+            ⏳ En attente des adversaires du tour précédent
+          </div>
+        )}
+
+        {!readonly && !isDone && !isWaitingForTeams && (
           <div className="flex flex-wrap gap-2 pt-3 mt-3 border-t border-dark-300">
             {partie.statut === 'A_JOUER' && (
               <>

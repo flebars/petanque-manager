@@ -26,7 +26,10 @@ export class ClassementService {
     }
 
     return this.prisma.classement.findMany({
-      where: { concoursId },
+      where: {
+        concoursId,
+        equipe: { nom: { notIn: ['__TBD__', '__BYE__'] } },
+      },
       include: { equipe: { include: { joueurs: { include: { joueur: true } } } } },
       orderBy: [
         { rang: 'asc' },
@@ -53,6 +56,7 @@ export class ClassementService {
   private async recalculerEquipes(concoursId: string): Promise<void> {
     const parties = await this.prisma.partie.findMany({
       where: { concoursId, statut: { in: [StatutPartie.TERMINEE, StatutPartie.FORFAIT] } },
+      include: { equipeB: { select: { nom: true } } },
     });
 
     const stats = new Map<
@@ -62,7 +66,7 @@ export class ClassementService {
 
     for (const partie of parties) {
       if (partie.scoreA === null || partie.scoreB === null) continue;
-      if (partie.equipeAId === partie.equipeBId) {
+      if (partie.equipeB.nom === '__BYE__') {
         const s = stats.get(partie.equipeAId) ?? {
           victoires: 0, defaites: 0, pointsMarques: 0, pointsEncaisses: 0,
         };
@@ -129,9 +133,8 @@ export class ClassementService {
       if (partie.scoreA === null || partie.scoreB === null) continue;
 
       const joueursA = partie.equipeA.joueurs.map((ej) => ej.joueurId);
-      const joueursB = partie.equipeB.joueurs.map((ej) => ej.joueurId);
 
-      if (partie.equipeAId === partie.equipeBId) {
+      if (partie.equipeB.nom === '__BYE__') {
         for (const joueurId of joueursA) {
           const s = stats.get(joueurId) ?? {
             victoires: 0, defaites: 0, pointsMarques: 0, pointsEncaisses: 0,
@@ -142,6 +145,8 @@ export class ClassementService {
         }
         continue;
       }
+
+      const joueursB = partie.equipeB.joueurs.map((ej) => ej.joueurId);
 
       for (const joueurId of joueursA) {
         const s = stats.get(joueurId) ?? {
@@ -189,7 +194,10 @@ export class ClassementService {
 
   private async assignerRangsEquipes(concoursId: string): Promise<void> {
     const classements = await this.prisma.classement.findMany({
-      where: { concoursId },
+      where: {
+        concoursId,
+        equipe: { nom: { notIn: ['__TBD__', '__BYE__'] } },
+      },
       orderBy: [
         { victoires: 'desc' },
         { quotient: 'desc' },
