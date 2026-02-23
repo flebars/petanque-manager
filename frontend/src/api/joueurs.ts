@@ -15,4 +15,7 @@ export const joueursApi = {
 
   remove: (id: string): Promise<void> =>
     api.delete(`/joueurs/${id}`).then(() => undefined),
+
+  changePassword: (data: { oldPassword: string; newPassword: string }): Promise<{ message: string }> =>
+    api.patch<{ message: string }>('/joueurs/me/password', data).then((r) => r.data),
 };

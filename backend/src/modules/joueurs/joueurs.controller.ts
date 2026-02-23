@@ -5,6 +5,9 @@ import { AuthGuard } from '@nestjs/passport';
 import { JoueursService } from './joueurs.service';
 import { CreateJoueurDto } from './dto/create-joueur.dto';
 import { UpdateJoueurDto } from './dto/update-joueur.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { JwtPayload } from '@/modules/auth/strategies/jwt.strategy';
 import { Joueur } from '@prisma/client';
 
 @Controller('joueurs')
@@ -25,6 +28,14 @@ export class JoueursController {
   @Post()
   create(@Body() dto: CreateJoueurDto): Promise<Joueur> {
     return this.joueursService.create(dto);
+  }
+
+  @Patch('me/password')
+  changePassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    return this.joueursService.changePassword(user.sub, dto);
   }
 
   @Patch(':id')

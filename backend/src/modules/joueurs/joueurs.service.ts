@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateJoueurDto } from './dto/create-joueur.dto';
 import { UpdateJoueurDto } from './dto/update-joueur.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { Joueur } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class JoueursService {
@@ -49,5 +51,25 @@ export class JoueursService {
   async remove(id: string): Promise<void> {
     await this.findOne(id);
     await this.prisma.joueur.delete({ where: { id } });
+  }
+
+  async changePassword(joueurId: string, dto: ChangePasswordDto): Promise<{ message: string }> {
+    const joueur = await this.prisma.joueur.findUnique({
+      where: { id: joueurId },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!joueur) throw new NotFoundException(`Joueur ${joueurId} introuvable`);
+
+    const isValid = await bcrypt.compare(dto.oldPassword, joueur.passwordHash);
+    if (!isValid) throw new UnauthorizedException('Ancien mot de passe incorrect');
+
+    const newHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.joueur.update({
+      where: { id: joueurId },
+      data: { passwordHash: newHash },
+    });
+
+    return { message: 'Mot de passe modifié avec succès' };
   }
 }

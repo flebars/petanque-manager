@@ -9,10 +9,12 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
 
 async function main(): Promise<void> {
-  console.log('Seeding database...');
+  const isProduction = process.env.NODE_ENV === 'production';
+  console.log(`Seeding database (${isProduction ? 'production' : 'development'})...`);
 
   // ─── Super-admin ─────────────────────────────────────────────────────────
-  const adminHash = await bcrypt.hash('admin1234', 10);
+  const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin1234';
+  const adminHash = await bcrypt.hash(adminPassword, 10);
   const admin = await prisma.joueur.upsert({
     where: { email: 'admin@petanque.fr' },
     update: {},
@@ -27,7 +29,12 @@ async function main(): Promise<void> {
       club: 'FFPJP',
     },
   });
-  console.log(`  ✓ Super-admin: ${admin.email} / admin1234`);
+  console.log(`  ✓ Super-admin: ${admin.email} / ${isProduction ? '***' : adminPassword}`);
+
+  if (isProduction) {
+    console.log('\n✅ Seed production terminé.\n');
+    return;
+  }
 
   // ─── Organisateur ────────────────────────────────────────────────────────
   const orgHash = await bcrypt.hash('orga1234', 10);
