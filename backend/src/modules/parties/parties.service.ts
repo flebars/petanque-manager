@@ -613,6 +613,13 @@ export class PartiesService {
     return 1;
   }
 
+  private calculateConsolanteBracketRonde(matchCount: number): number {
+    // Consolante bracket starts at Round 5 (since it's losers from Round 4 QFs)
+    // For 2-4 losers: matches at Round 5
+    // Consolante Final will be created by progression, not by this function
+    return 5; // All consolante initial matches start at Round 5
+  }
+
   private async progresserMatchBracket(completedMatch: Partie): Promise<void> {
     if (!completedMatch.bracketRonde || completedMatch.bracketPos === null || completedMatch.bracketPos === undefined) {
       return;
@@ -630,6 +637,7 @@ export class PartiesService {
       ? completedMatch.equipeBId 
       : completedMatch.equipeAId;
 
+    // Only add to consolante if this is a main bracket Tour 1 match
     if (completedMatch.type === TypePartie.COUPE_PRINCIPALE && completedMatch.tour === 1) {
       const concours = await this.prisma.concours.findUnique({
         where: { id: completedMatch.concoursId },
@@ -637,7 +645,13 @@ export class PartiesService {
 
       const consolanteEnabled = (concours?.params as any)?.consolante === true;
       if (consolanteEnabled) {
-        await this.addLoserToConsolante(completedMatch.concoursId, loserId, completedMatch.bracketPos);
+        console.log(`[BRACKET] Adding loser to consolante for match pos ${completedMatch.bracketPos}`);
+        try {
+          await this.addLoserToConsolante(completedMatch.concoursId, loserId, completedMatch.bracketPos);
+          console.log(`[BRACKET] Consolante update completed for pos ${completedMatch.bracketPos}`);
+        } catch (error) {
+          console.error(`[BRACKET] Error adding to consolante:`, error);
+        }
       }
     }
 
@@ -645,6 +659,9 @@ export class PartiesService {
     const nextBracketPos = Math.floor(completedMatch.bracketPos / 2);
     const isTeamA = completedMatch.bracketPos % 2 === 0;
 
+    console.log(`[BRACKET] About to progress to next round: type=${completedMatch.type}, bracketRonde=${completedMatch.bracketRonde}, nextPos=${nextBracketPos}, isTeamA=${isTeamA}`);
+
+    // Semi-finals (round 5) create finals (round 6)
     if (completedMatch.bracketRonde === 5) {
       await this.createOrUpdateFinale(
         completedMatch.concoursId,
@@ -653,6 +670,12 @@ export class PartiesService {
         loserId,
         isTeamA,
       );
+      return;
+    }
+
+    // Finals (round 6) are the end - no further progression
+    if (completedMatch.bracketRonde === 6) {
+      console.log(`[BRACKET] Finals completed - no further progression`);
       return;
     }
 
@@ -667,6 +690,7 @@ export class PartiesService {
   }
 
   private async addLoserToConsolante(concoursId: string, loserId: string, mainBracketPos: number): Promise<void> {
+    // Get all Tour 1 main bracket matches
     const allTour1Matches = await this.prisma.partie.findMany({
       where: {
         concoursId,
@@ -679,15 +703,10 @@ export class PartiesService {
       m => m.statut === StatutPartie.TERMINEE || m.statut === StatutPartie.FORFAIT
     );
 
-    const nonByeMatches = allTour1Matches.filter(m => m.equipeAId !== m.equipeBId);
-
-    if (completedMatches.length < 2) {
-      return;
-    }
-
+    // Collect all losers from completed matches
     const losers: Array<{ id: string; pos: number }> = [];
     for (const match of completedMatches) {
-      if (match.equipeAId === match.equipeBId) continue;
+      if (match.equipeAId === match.equipeBId) continue; // Skip bye matches
 
       const loser = (match.scoreA ?? 0) < (match.scoreB ?? 0)
         ? match.equipeAId
@@ -696,20 +715,29 @@ export class PartiesService {
     }
 
     if (losers.length < 2) {
+      console.log(`[BRACKET] Not enough losers yet for consolante (${losers.length}/2)`);
       return;
     }
 
+    // Calculate consolante bracket structure  
     const { generateBracket } = await import('@/modules/tirage/tirage.service');
     const loserIds = losers.map(l => l.id);
-    const slots = generateBracket(loserIds, `consolante-${Date.now()}`);
+    // Use a deterministic seed based on tournament ID and loser count
+    // This ensures the same losers always produce the same bracket structure
+    const seed = `consolante-${concoursId}-${losers.length}`;
+    const slots = generateBracket(loserIds, seed);
 
     const matchCount = Math.floor(slots.length / 2);
-    const bracketRonde = this.calculateBracketRonde(matchCount);
+    const bracketRonde = this.calculateConsolanteBracketRonde(matchCount);
 
+    console.log(`[BRACKET] Consolante: ${losers.length} losers, creating ${matchCount} matches at Round ${bracketRonde}`);
+
+    // Get existing consolante matches - ONLY for this round
     const existingConsolanteMatches = await this.prisma.partie.findMany({
       where: {
         concoursId,
         type: TypePartie.COUPE_CONSOLANTE,
+        bracketRonde, // Only get matches for the current round
       },
     });
 
@@ -718,40 +746,85 @@ export class PartiesService {
       orderBy: { numero: 'asc' },
     });
 
-    const createdMatches = [];
+    // Create or update consolante matches FOR THIS ROUND ONLY
     let matchIndex = 0;
     for (let i = 0; i < slots.length; i += 2) {
       const slotA = slots[i];
       const slotB = slots[i + 1];
 
-      if (slotA.isBye || slotB.isBye) {
-        const realTeamId = slotA.equipeId ?? slotB.equipeId;
-        if (!realTeamId) continue;
+      // Find if this match already exists
+      const existingMatch = existingConsolanteMatches.find(
+        m => m.bracketPos === matchIndex
+      );
 
-        const byeMatch = await this.prisma.partie.create({
-          data: {
-            concoursId,
-            tour: 1,
-            equipeAId: realTeamId,
-            equipeBId: realTeamId,
-            scoreA: 13,
-            scoreB: 0,
-            statut: StatutPartie.TERMINEE,
-            type: TypePartie.COUPE_CONSOLANTE,
-            bracketRonde,
-            bracketPos: matchIndex,
-            terrainId: terrains[createdMatches.length % terrains.length]?.id,
-            heureFin: new Date(),
-          },
-        });
-        createdMatches.push(byeMatch);
-      } else if (slotA.equipeId && slotB.equipeId) {
-        const existingMatch = existingConsolanteMatches.find(
-          m => m.bracketPos === matchIndex && m.bracketRonde === bracketRonde
-        );
+      if (slotA.isBye || slotB.isBye) {
+        // Bye match - one team gets a free pass
+        const realTeamId = slotA.equipeId ?? slotB.equipeId;
+        if (!realTeamId) {
+          matchIndex++;
+          continue;
+        }
 
         if (!existingMatch) {
-          const match = await this.prisma.partie.create({
+          // Create bye match - mark as TERMINEE but DON'T call progression
+          // Progression will be handled when the OTHER SF match completes
+          const byeMatch = await this.prisma.partie.create({
+            data: {
+              concoursId,
+              tour: 1,
+              equipeAId: realTeamId,
+              equipeBId: realTeamId,
+              scoreA: 13,
+              scoreB: 0,
+              statut: StatutPartie.TERMINEE,
+              type: TypePartie.COUPE_CONSOLANTE,
+              bracketRonde,
+              bracketPos: matchIndex,
+              terrainId: terrains[matchIndex % terrains.length]?.id,
+              heureFin: new Date(),
+            },
+          });
+          console.log(`[BRACKET] Created consolante bye match at R${bracketRonde} P${matchIndex}`);
+        }
+      } else if (slotA.equipeId && slotB.equipeId) {
+        // Regular match with two teams
+        if (existingMatch) {
+          // Update existing match if needed
+          const updateData: any = {};
+          if (existingMatch.equipeAId === existingMatch.equipeBId) {
+            // Placeholder match - update with both teams
+            if (slotA.equipeId !== existingMatch.equipeAId || slotB.equipeId !== existingMatch.equipeBId) {
+              updateData.equipeAId = slotA.equipeId;
+              updateData.equipeBId = slotB.equipeId;
+            }
+          } else {
+            // Match already has two different teams - check if we need to update
+            if (existingMatch.equipeAId !== slotA.equipeId) {
+              updateData.equipeAId = slotA.equipeId;
+            }
+            if (existingMatch.equipeBId !== slotB.equipeId) {
+              updateData.equipeBId = slotB.equipeId;
+            }
+          }
+
+          if (Object.keys(updateData).length > 0) {
+            await this.prisma.partie.update({
+              where: { id: existingMatch.id },
+              data: updateData,
+            });
+            console.log(`[BRACKET] Updated consolante match R${bracketRonde} P${matchIndex}`);
+
+            // Assign terrain if both teams are ready
+            const updated = await this.prisma.partie.findUnique({
+              where: { id: existingMatch.id },
+            });
+            if (updated && updated.equipeAId !== updated.equipeBId && !updated.terrainId) {
+              await this.assignTerrainToMatch(updated.id, concoursId);
+            }
+          }
+        } else {
+          // Create new match
+          const newMatch = await this.prisma.partie.create({
             data: {
               concoursId,
               tour: 1,
@@ -761,10 +834,15 @@ export class PartiesService {
               type: TypePartie.COUPE_CONSOLANTE,
               bracketRonde,
               bracketPos: matchIndex,
-              terrainId: terrains[createdMatches.length % terrains.length]?.id,
+              terrainId: terrains[matchIndex % terrains.length]?.id,
             },
           });
-          createdMatches.push(match);
+          console.log(`[BRACKET] Created consolante match R${bracketRonde} P${matchIndex}`);
+
+          // Assign terrain if needed
+          if (newMatch.equipeAId !== newMatch.equipeBId) {
+            await this.assignTerrainToMatch(newMatch.id, concoursId);
+          }
         }
       }
       matchIndex++;
@@ -798,10 +876,25 @@ export class PartiesService {
       
       const updateData: any = {};
       
-      if (isTeamA && existingMatch.equipeAId !== winnerId) {
-        updateData.equipeAId = winnerId;
-      } else if (!isTeamA && existingMatch.equipeBId !== winnerId) {
-        updateData.equipeBId = winnerId;
+      // Handle placeholder match (both slots same team)
+      if (existingMatch.equipeAId === existingMatch.equipeBId) {
+        // This is a placeholder - determine which slot based on isTeamA
+        if (isTeamA) {
+          // First team stays in slot A, placeholder moves to B for now
+          // (will be replaced when second team arrives)
+          updateData.equipeAId = winnerId;
+          // Keep equipeBId as is (placeholder)
+        } else {
+          // Second team arrives - update slot B
+          updateData.equipeBId = winnerId;
+        }
+      } else {
+        // Normal update - match already has two different teams
+        if (isTeamA && existingMatch.equipeAId !== winnerId) {
+          updateData.equipeAId = winnerId;
+        } else if (!isTeamA && existingMatch.equipeBId !== winnerId) {
+          updateData.equipeBId = winnerId;
+        }
       }
 
       if (Object.keys(updateData).length > 0) {
@@ -865,6 +958,7 @@ export class PartiesService {
         (m.scoreA ?? 0) < (m.scoreB ?? 0) ? m.equipeAId : m.equipeBId
       );
 
+      // Grande Finale (winners play for 1st/2nd place)
       const grandeFinale = await this.prisma.partie.findFirst({
         where: { concoursId, type, bracketRonde: 6, bracketPos: 0 },
       });
@@ -885,6 +979,8 @@ export class PartiesService {
         await this.assignTerrainToMatch(newGrandeFinale.id, concoursId);
       }
 
+      // Petite Finale (losers play for 3rd place)
+      // Both main bracket AND consolante have Petite Finales per specification
       const petiteFinale = await this.prisma.partie.findFirst({
         where: { concoursId, type, bracketRonde: 6, bracketPos: 1 },
       });
