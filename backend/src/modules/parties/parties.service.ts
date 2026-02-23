@@ -661,20 +661,42 @@ export class PartiesService {
 
     console.log(`[BRACKET] About to progress to next round: type=${completedMatch.type}, bracketRonde=${completedMatch.bracketRonde}, nextPos=${nextBracketPos}, isTeamA=${isTeamA}`);
 
-    // Semi-finals (round 5) create finals (round 6)
-    if (completedMatch.bracketRonde === 5) {
+    // Check if we're at Semi-Finals by counting completed matches at this round
+    const completedMatchesAtThisRound = await this.prisma.partie.findMany({
+      where: {
+        concoursId: completedMatch.concoursId,
+        type: completedMatch.type,
+        bracketRonde: completedMatch.bracketRonde,
+        statut: { in: [StatutPartie.TERMINEE, StatutPartie.FORFAIT] },
+      },
+    });
+
+    // Semi-finals are when exactly 2 matches are completed at the current round
+    if (completedMatchesAtThisRound.length === 2) {
+      console.log(`[BRACKET] Detected Semi-Finals completion at round ${completedMatch.bracketRonde} for type ${completedMatch.type}`);
       await this.createOrUpdateFinale(
         completedMatch.concoursId,
         completedMatch.type!,
         winnerId,
         loserId,
         isTeamA,
+        completedMatch.bracketRonde,
       );
       return;
     }
 
-    // Finals (round 6) are the end - no further progression
-    if (completedMatch.bracketRonde === 6) {
+    // Check if this is already a Finals match (bracketPos 0 or 1 in the finals round)
+    const finalsRound = completedMatch.bracketRonde + 1;
+    const existingFinalsMatches = await this.prisma.partie.findMany({
+      where: {
+        concoursId: completedMatch.concoursId,
+        type: completedMatch.type,
+        bracketRonde: finalsRound,
+      },
+    });
+
+    // If finals matches already exist at the next round, this is the end
+    if (existingFinalsMatches.length >= 2) {
       console.log(`[BRACKET] Finals completed - no further progression`);
       return;
     }
@@ -940,12 +962,13 @@ export class PartiesService {
     winnerId: string,
     loserId: string,
     isFirstDemiFinale: boolean,
+    semiFinalRonde: number,
   ): Promise<void> {
     const demiFinales = await this.prisma.partie.findMany({
       where: {
         concoursId,
         type,
-        bracketRonde: 5,
+        bracketRonde: semiFinalRonde,
         statut: { in: [StatutPartie.TERMINEE, StatutPartie.FORFAIT] },
       },
     });
@@ -958,9 +981,12 @@ export class PartiesService {
         (m.scoreA ?? 0) < (m.scoreB ?? 0) ? m.equipeAId : m.equipeBId
       );
 
+      const finaleRonde = semiFinalRonde + 1;
+      console.log(`[BRACKET] Creating finales at round ${finaleRonde} for type ${type}`);
+
       // Grande Finale (winners play for 1st/2nd place)
       const grandeFinale = await this.prisma.partie.findFirst({
-        where: { concoursId, type, bracketRonde: 6, bracketPos: 0 },
+        where: { concoursId, type, bracketRonde: finaleRonde, bracketPos: 0 },
       });
 
       if (!grandeFinale) {
@@ -968,7 +994,7 @@ export class PartiesService {
           data: {
             concoursId,
             type,
-            bracketRonde: 6,
+            bracketRonde: finaleRonde,
             bracketPos: 0,
             equipeAId: winners[0],
             equipeBId: winners[1],
@@ -977,12 +1003,13 @@ export class PartiesService {
           },
         });
         await this.assignTerrainToMatch(newGrandeFinale.id, concoursId);
+        console.log(`[BRACKET] Created Grande Finale at R${finaleRonde} P0`);
       }
 
       // Petite Finale (losers play for 3rd place)
       // Both main bracket AND consolante have Petite Finales per specification
       const petiteFinale = await this.prisma.partie.findFirst({
-        where: { concoursId, type, bracketRonde: 6, bracketPos: 1 },
+        where: { concoursId, type, bracketRonde: finaleRonde, bracketPos: 1 },
       });
 
       if (!petiteFinale) {
@@ -990,7 +1017,7 @@ export class PartiesService {
           data: {
             concoursId,
             type,
-            bracketRonde: 6,
+            bracketRonde: finaleRonde,
             bracketPos: 1,
             equipeAId: losers[0],
             equipeBId: losers[1],
@@ -999,6 +1026,7 @@ export class PartiesService {
           },
         });
         await this.assignTerrainToMatch(newPetiteFinale.id, concoursId);
+        console.log(`[BRACKET] Created Petite Finale at R${finaleRonde} P1`);
       }
     }
   }

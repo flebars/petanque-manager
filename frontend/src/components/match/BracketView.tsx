@@ -30,7 +30,7 @@ function isPlaceholder(match: DisplayMatch): match is PlaceholderMatch {
 }
 
 function calculateExpectedMatchesForRound(bracketRonde: number, firstRoundMatchCount: number): number {
-  if (bracketRonde === 6) {
+  if (bracketRonde >= 6) {
     return 2;
   }
   if (bracketRonde === 5) {
@@ -221,7 +221,7 @@ export function BracketView({ parties, type, onMatchClick }: BracketViewProps) {
                 {isPlaceholder(match) ? (
                   <PlaceholderMatchCard placeholder={match} />
                 ) : (
-                  <BracketMatchCard match={match} isFinale={activeRound === 6} />
+                  <BracketMatchCard match={match} isFinale={match.bracketPos === 0 || match.bracketPos === 1} />
                 )}
               </div>
             ))}
@@ -245,7 +245,7 @@ export function BracketView({ parties, type, onMatchClick }: BracketViewProps) {
                   {isPlaceholder(match) ? (
                     <PlaceholderMatchCard placeholder={match} showProjectionLabel />
                   ) : (
-                    <BracketMatchCard match={match} isFinale={(activeRound + 1) === 6} preview />
+                    <BracketMatchCard match={match} isFinale={match.bracketPos === 0 || match.bracketPos === 1} preview />
                   )}
                 </div>
               ))}
@@ -258,21 +258,33 @@ export function BracketView({ parties, type, onMatchClick }: BracketViewProps) {
 }
 
 function getRoundLabel(ronde: string, matches: Partie[]): string {
-  switch (ronde) {
-    case '6':
-      if (matches.length === 2) {
-        return 'Finales';
-      }
-      return 'Finale';
-    case '5':
-      return 'Demi-finales';
-    case '4':
+  const roundNum = parseInt(ronde);
+  
+  const finalsMatches = matches.filter(m => m.bracketPos === 0 || m.bracketPos === 1);
+  const hasGrandeFinale = finalsMatches.some(m => m.bracketPos === 0);
+  const hasPetiteFinale = finalsMatches.some(m => m.bracketPos === 1);
+  
+  if (hasGrandeFinale && hasPetiteFinale && finalsMatches.length === 2) {
+    return 'Finales';
+  }
+  
+  if (hasGrandeFinale || hasPetiteFinale) {
+    return 'Finale';
+  }
+  
+  const matchCount = matches.length;
+  if (matchCount === 2) {
+    return 'Demi-finales';
+  }
+  
+  switch (roundNum) {
+    case 4:
       return 'Quarts de finale';
-    case '3':
+    case 3:
       return 'Huitièmes de finale';
-    case '2':
+    case 2:
       return 'Seizièmes de finale';
-    case '1':
+    case 1:
       return 'Trente-deuxièmes de finale';
     default:
       return `Tour ${ronde}`;
@@ -280,9 +292,10 @@ function getRoundLabel(ronde: string, matches: Partie[]): string {
 }
 
 function getRoundShortLabel(round: number): string {
+  if (round >= 6) {
+    return 'F';
+  }
   switch (round) {
-    case 6:
-      return 'F';
     case 5:
       return '1/2';
     case 4:
@@ -429,8 +442,8 @@ interface PlaceholderMatchCardProps {
 }
 
 function PlaceholderMatchCard({ placeholder, showProjectionLabel = false }: PlaceholderMatchCardProps) {
-  const isGrandeFinale = placeholder.bracketRonde === 6 && placeholder.bracketPos === 0;
-  const isPetiteFinale = placeholder.bracketRonde === 6 && placeholder.bracketPos === 1;
+  const isGrandeFinale = placeholder.bracketPos === 0;
+  const isPetiteFinale = placeholder.bracketPos === 1;
 
   return (
     <div className="space-y-1">
