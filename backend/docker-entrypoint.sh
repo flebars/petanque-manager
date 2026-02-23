@@ -2,7 +2,7 @@
 set -e
 
 echo "Running database migrations..."
-npx prisma migrate deploy --url "$DATABASE_URL"
+npx prisma migrate deploy
 
 echo "Running database seed..."
 NODE_ENV=${NODE_ENV:-production} node -e "
