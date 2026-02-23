@@ -1,10 +1,10 @@
-require('dotenv/config');
+const path = require('path');
 
 /** @type {import('prisma/config').PrismaConfig} */
 module.exports = {
-  schema: './prisma/schema.prisma',
+  schema: path.join(__dirname, 'prisma/schema.prisma'),
   migrations: {
-    path: './prisma/migrations',
+    path: path.join(__dirname, 'prisma/migrations'),
   },
   datasource: {
     url: process.env.DATABASE_URL ?? '',
