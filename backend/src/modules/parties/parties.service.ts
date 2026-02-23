@@ -96,14 +96,18 @@ export class PartiesService {
     await this.classementService.recalculer(partie.concoursId);
     this.eventsGateway.emitScoreValide(partie.concoursId, updated);
 
+    const concours = await this.prisma.concours.findUnique({
+      where: { id: partie.concoursId },
+    });
+
     console.log('[DEBUG] Checking progression:', {
-      format: partie.concours?.format,
+      format: concours?.format,
       type: updated.type,
       bracketRonde: updated.bracketRonde,
       bracketPos: updated.bracketPos,
     });
 
-    if (partie.concours?.format === FormatConcours.COUPE && 
+    if (concours?.format === FormatConcours.COUPE && 
         (updated.type === TypePartie.COUPE_PRINCIPALE || updated.type === TypePartie.COUPE_CONSOLANTE)) {
       console.log('[DEBUG] Calling progresserMatchBracket');
       await this.progresserMatchBracket(updated);
@@ -142,7 +146,11 @@ export class PartiesService {
     await this.classementService.recalculer(partie.concoursId);
     this.eventsGateway.emitScoreValide(partie.concoursId, updated);
 
-    if (partie.concours?.format === FormatConcours.COUPE && 
+    const concours = await this.prisma.concours.findUnique({
+      where: { id: partie.concoursId },
+    });
+
+    if (concours?.format === FormatConcours.COUPE && 
         (updated.type === TypePartie.COUPE_PRINCIPALE || updated.type === TypePartie.COUPE_CONSOLANTE)) {
       await this.progresserMatchBracket(updated);
     }
