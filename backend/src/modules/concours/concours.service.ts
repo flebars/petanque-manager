@@ -51,9 +51,9 @@ export class ConcoursService {
     return {
       ...concours,
       equipes: concours.modeConstitution === ModeConstitution.MELEE_DEMELEE
-        ? concours.equipes.filter((e) => e.tour === null)
-        : concours.equipes,
-    };
+        ? (concours as any).equipes.filter((e: any) => e.tour === null)
+        : (concours as any).equipes,
+    } as unknown as Concours;
   }
 
   async create(dto: CreateConcoursDto, organisateurId: string): Promise<Concours> {
@@ -130,7 +130,7 @@ export class ConcoursService {
       throw new BadRequestException('Le concours est déjà démarré ou terminé');
     }
 
-    const equipes = concours.equipes as any[];
+    const equipes = (concours as any).equipes as any[];
     if (equipes.length < 2) {
       throw new BadRequestException('Au moins 2 participants sont nécessaires');
     }
