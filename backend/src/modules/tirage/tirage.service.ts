@@ -197,11 +197,11 @@ export function generatePoolAssignments(
 /**
  * Groupe des joueurs individuels en équipes pour les modes Mêlée et Mêlée-Démêlée.
  *
- * Algorithme (spec §2) :
+ * Algorithme :
  *  - Mélanger aléatoirement tous les joueurs
  *  - Former des équipes de `tailleEquipe` joueurs
- *  - Si le reste est > 0 et < tailleEquipe : constituer la dernière équipe
- *    avec (tailleEquipe - 1) joueurs (jamais moins)
+ *  - Si un reste existe (< tailleEquipe), créer une dernière équipe avec ces joueurs
+ *  - IMPORTANT : jamais d'équipe avec plus de `tailleEquipe` joueurs
  *
  * @param joueurIds   IDs des joueurs inscrits (1 par entrée)
  * @param tailleEquipe  Taille cible (1, 2 ou 3)
@@ -218,21 +218,10 @@ export function constituerEquipesMelee(
   const rng = seededRng(seed);
   const shuffled = shuffleArray(joueurIds, rng);
   const equipes: string[][] = [];
-  let i = 0;
 
-  while (i < shuffled.length) {
-    const remaining = shuffled.length - i;
-    if (remaining >= tailleEquipe) {
-      equipes.push(shuffled.slice(i, i + tailleEquipe));
-      i += tailleEquipe;
-    } else {
-      if (equipes.length > 0) {
-        equipes[equipes.length - 1].push(...shuffled.slice(i));
-      } else {
-        equipes.push(shuffled.slice(i));
-      }
-      break;
-    }
+  for (let i = 0; i < shuffled.length; i += tailleEquipe) {
+    const groupe = shuffled.slice(i, i + tailleEquipe);
+    equipes.push(groupe);
   }
 
   return equipes;

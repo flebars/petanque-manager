@@ -141,6 +141,7 @@ model Equipe {
   concoursId    String
   nom           String?
   numeroTirage  Int?
+  tour          Int?
   statut        StatutEquipe @default(INSCRITE)
   concours      Concours     @relation(fields: [concoursId], references: [id], onDelete: Cascade)
   createdAt     DateTime     @default(now())

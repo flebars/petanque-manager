@@ -4,7 +4,7 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateConcoursDto } from './dto/create-concours.dto';
 import { UpdateConcoursDto } from './dto/update-concours.dto';
-import { Concours, ModeConstitution, StatutConcours, FormatConcours, TypeEquipe } from '@prisma/client';
+import { Concours, ModeConstitution, StatutConcours, FormatConcours, TypeEquipe, Role } from '@prisma/client';
 import { constituerEquipesMelee } from '@/modules/tirage/tirage.service';
 
 type ConcoursParams = {
@@ -23,11 +23,18 @@ const TAILLE_EQUIPE: Record<TypeEquipe, number> = {
 export class ConcoursService {
   constructor(private prisma: PrismaService) {}
 
-  findAll(): Promise<Concours[]> {
-    return this.prisma.concours.findMany({
+  async findAll(): Promise<Concours[]> {
+    const concours = await this.prisma.concours.findMany({
       include: { equipes: true, organisateur: { select: { nom: true, prenom: true } } },
       orderBy: { dateDebut: 'desc' },
     });
+
+    return concours.map((c) => ({
+      ...c,
+      equipes: c.modeConstitution === ModeConstitution.MELEE_DEMELEE
+        ? c.equipes.filter((e) => e.tour === null)
+        : c.equipes,
+    }));
   }
 
   async findOne(id: string): Promise<Concours> {
@@ -40,7 +47,13 @@ export class ConcoursService {
       },
     });
     if (!concours) throw new NotFoundException(`Concours ${id} introuvable`);
-    return concours;
+
+    return {
+      ...concours,
+      equipes: concours.modeConstitution === ModeConstitution.MELEE_DEMELEE
+        ? concours.equipes.filter((e) => e.tour === null)
+        : concours.equipes,
+    };
   }
 
   async create(dto: CreateConcoursDto, organisateurId: string): Promise<Concours> {
@@ -79,12 +92,12 @@ export class ConcoursService {
     return this.findOne(concours.id);
   }
 
-  async update(id: string, dto: UpdateConcoursDto, userId: string): Promise<Concours> {
+  async update(id: string, dto: UpdateConcoursDto, userId: string, userRole: Role): Promise<Concours> {
     const concours = await this.findOne(id);
     if (concours.statut !== StatutConcours.INSCRIPTION) {
       throw new BadRequestException('Impossible de modifier un concours déjà démarré');
     }
-    if (concours.organisateurId !== userId) {
+    if (concours.organisateurId !== userId && userRole !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Accès refusé');
     }
 
@@ -100,15 +113,19 @@ export class ConcoursService {
     });
   }
 
-  async remove(id: string, userId: string): Promise<void> {
+  async remove(id: string, userId: string, userRole: Role): Promise<void> {
     const concours = await this.findOne(id);
-    if (concours.organisateurId !== userId) throw new ForbiddenException('Accès refusé');
+    if (concours.organisateurId !== userId && userRole !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Accès refusé');
+    }
     await this.prisma.concours.delete({ where: { id } });
   }
 
-  async demarrer(id: string, userId: string): Promise<Concours> {
+  async demarrer(id: string, userId: string, userRole: Role): Promise<Concours> {
     const concours = await this.findOne(id);
-    if (concours.organisateurId !== userId) throw new ForbiddenException('Accès refusé');
+    if (concours.organisateurId !== userId && userRole !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Accès refusé');
+    }
     if (concours.statut !== StatutConcours.INSCRIPTION) {
       throw new BadRequestException('Le concours est déjà démarré ou terminé');
     }
@@ -118,6 +135,16 @@ export class ConcoursService {
       throw new BadRequestException('Au moins 2 participants sont nécessaires');
     }
 
+    await this.prisma.equipe.updateMany({
+      where: {
+        concoursId: id,
+        statut: 'INSCRITE',
+      },
+      data: {
+        statut: 'PRESENTE',
+      },
+    });
+
     // Modes MELEE et MELEE_DEMELEE : regrouper les joueurs individuels en équipes
     // avant le premier tirage. Pour MELEE les équipes restent fixes ; pour
     // MELEE_DEMELEE elles seront redisssoutes et reformées à chaque tour suivant.
@@ -125,7 +152,12 @@ export class ConcoursService {
       concours.modeConstitution === ModeConstitution.MELEE ||
       concours.modeConstitution === ModeConstitution.MELEE_DEMELEE
     ) {
-      await this.constituerEquipes(concours.id, equipes, concours.typeEquipe as TypeEquipe);
+      await this.constituerEquipes(
+        concours.id,
+        equipes,
+        concours.typeEquipe as TypeEquipe,
+        concours.modeConstitution,
+      );
     }
 
     return this.prisma.concours.update({
@@ -136,13 +168,17 @@ export class ConcoursService {
 
   /**
    * Regroupe les inscriptions individuelles (1 joueur/equipe) en vraies équipes
-   * multi-joueurs selon typeEquipe. Supprime les équipes individuelles et crée
-   * les nouvelles équipes groupées dans la même transaction.
+   * multi-joueurs selon typeEquipe.
+   * 
+   * Pour MELEE: supprime les équipes individuelles et crée les nouvelles équipes (tour=null).
+   * Pour MELEE_DEMELEE: conserve les inscriptions individuelles (tour=null) et crée
+   * les équipes du tour 1 (tour=1).
    */
   async constituerEquipes(
     concoursId: string,
     equipesSolo: Array<{ id: string; joueurs: Array<{ joueurId: string }> }>,
     typeEquipe: TypeEquipe,
+    modeConstitution: ModeConstitution,
   ): Promise<void> {
     const taille = TAILLE_EQUIPE[typeEquipe];
 
@@ -155,15 +191,23 @@ export class ConcoursService {
     const groupes = constituerEquipesMelee(joueurIds, taille, seed);
 
     await this.prisma.$transaction(async (tx) => {
-      // Supprimer toutes les équipes solo existantes
-      await tx.equipe.deleteMany({ where: { concoursId } });
+      // Pour MELEE_DEMELEE, conserver les inscriptions individuelles (tour=null)
+      // Pour MELEE, supprimer les équipes solo
+      if (modeConstitution !== ModeConstitution.MELEE_DEMELEE) {
+        await tx.equipe.deleteMany({ where: { concoursId } });
+      }
 
       // Créer les nouvelles équipes groupées
+      // MELEE_DEMELEE: tour=1 (équipes éphémères pour le premier tour)
+      // MELEE: tour=null (équipes permanentes)
+      const tourValue = modeConstitution === ModeConstitution.MELEE_DEMELEE ? 1 : null;
+
       for (let i = 0; i < groupes.length; i++) {
         await tx.equipe.create({
           data: {
             concoursId,
             numeroTirage: i + 1,
+            tour: tourValue,
             statut: 'PRESENTE',
             joueurs: {
               create: groupes[i].map((joueurId) => ({ joueurId })),
@@ -174,9 +218,11 @@ export class ConcoursService {
     });
   }
 
-  async terminer(id: string, userId: string): Promise<Concours> {
+  async terminer(id: string, userId: string, userRole: Role): Promise<Concours> {
     const concours = await this.findOne(id);
-    if (concours.organisateurId !== userId) throw new ForbiddenException('Accès refusé');
+    if (concours.organisateurId !== userId && userRole !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Accès refusé');
+    }
     if (concours.statut !== StatutConcours.EN_COURS) {
       throw new BadRequestException('Le concours n\'est pas en cours');
     }

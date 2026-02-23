@@ -1,16 +1,22 @@
 import {
-  Controller, Get, Post, Patch, Param, Body, UseGuards, Query,
+  Controller, Get, Post, Patch, Param, Body, UseGuards, Query, ForbiddenException, NotFoundException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PartiesService } from './parties.service';
 import { SaisirScoreDto } from './dto/saisir-score.dto';
 import { LitigeDto } from './dto/litige.dto';
-import { Partie } from '@prisma/client';
+import { Partie, Role } from '@prisma/client';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { JwtPayload } from '@/modules/auth/strategies/jwt.strategy';
+import { PrismaService } from '@/prisma/prisma.service';
 
 @Controller('parties')
 @UseGuards(AuthGuard('jwt'))
 export class PartiesController {
-  constructor(private partiesService: PartiesService) {}
+  constructor(
+    private partiesService: PartiesService,
+    private prisma: PrismaService,
+  ) {}
 
   @Get()
   findByConcours(@Query('concoursId') concoursId: string): Promise<Partie[]> {
@@ -61,5 +67,26 @@ export class PartiesController {
     @Param('tour') tour: string,
   ): Promise<Partie[]> {
     return this.partiesService.lancerTourMelee(concoursId, parseInt(tour, 10));
+  }
+
+  @Post('concours/:concoursId/tour/:tour/lancer-coupe')
+  async lancerTourCoupe(
+    @Param('concoursId') concoursId: string,
+    @Param('tour') tour: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<Partie[]> {
+    const concours = await this.prisma.concours.findUnique({
+      where: { id: concoursId },
+    });
+
+    if (!concours) {
+      throw new NotFoundException('Concours introuvable');
+    }
+
+    if (concours.organisateurId !== user.sub && user.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Seul l\'organisateur peut lancer un tour');
+    }
+
+    return this.partiesService.lancerTourCoupe(concoursId, parseInt(tour, 10));
   }
 }

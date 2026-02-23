@@ -4,6 +4,7 @@ import {
   generatePoolAssignments,
   generateRoundRobin,
   nextPowerOfTwo,
+  constituerEquipesMelee,
   EquipeInfo,
 } from './tirage.service';
 
@@ -214,5 +215,50 @@ describe('generateRoundRobin', () => {
       const count = pairs.filter((p) => p[0] === id || p[1] === id).length;
       expect(count).toBe(ids.length - 1);
     }
+  });
+});
+
+describe('constituerEquipesMelee', () => {
+  it('should create correct teams for exact multiple (Triplette, 9 players)', () => {
+    const joueurs = Array.from({ length: 9 }, (_, i) => `J${i}`);
+    const equipes = constituerEquipesMelee(joueurs, 3, 'seed');
+    expect(equipes).toHaveLength(3);
+    equipes.forEach((e) => expect(e.length).toBe(3));
+  });
+
+  it('should create N-1 team for remainder (Triplette, 34 players)', () => {
+    const joueurs = Array.from({ length: 34 }, (_, i) => `J${i}`);
+    const equipes = constituerEquipesMelee(joueurs, 3, 'seed');
+    expect(equipes).toHaveLength(12);
+    const sizes = equipes.map((e) => e.length);
+    expect(sizes.filter((s) => s === 3)).toHaveLength(11);
+    expect(sizes.filter((s) => s === 1)).toHaveLength(1);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(3);
+  });
+
+  it('should never create teams larger than tailleEquipe (Doublette, 7 players)', () => {
+    const joueurs = Array.from({ length: 7 }, (_, i) => `J${i}`);
+    const equipes = constituerEquipesMelee(joueurs, 2, 'seed');
+    equipes.forEach((e) => expect(e.length).toBeLessThanOrEqual(2));
+    expect(equipes).toHaveLength(4);
+    expect(equipes.filter((e) => e.length === 2).length).toBe(3);
+    expect(equipes.filter((e) => e.length === 1).length).toBe(1);
+  });
+
+  it('should handle single player remainder (Triplette, 10 players)', () => {
+    const joueurs = Array.from({ length: 10 }, (_, i) => `J${i}`);
+    const equipes = constituerEquipesMelee(joueurs, 3, 'seed');
+    expect(equipes).toHaveLength(4);
+    const sizes = equipes.map((e) => e.length);
+    expect(sizes.filter((s) => s === 3).length).toBe(3);
+    expect(sizes.filter((s) => s === 1).length).toBe(1);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(3);
+  });
+
+  it('should be deterministic with same seed', () => {
+    const joueurs = Array.from({ length: 34 }, (_, i) => `J${i}`);
+    const r1 = constituerEquipesMelee(joueurs, 3, 'seed');
+    const r2 = constituerEquipesMelee(joueurs, 3, 'seed');
+    expect(r1).toEqual(r2);
   });
 });

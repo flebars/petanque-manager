@@ -4,15 +4,24 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateEquipeDto } from './dto/create-equipe.dto';
 import { UpdateStatutEquipeDto } from './dto/update-statut-equipe.dto';
-import { Equipe, StatutConcours, StatutEquipe } from '@prisma/client';
+import { Equipe, StatutConcours, StatutEquipe, Role } from '@prisma/client';
+import type { JwtPayload } from '@/modules/auth/strategies/jwt.strategy';
 
 @Injectable()
 export class EquipesService {
   constructor(private prisma: PrismaService) {}
 
-  findByConcours(concoursId: string): Promise<Equipe[]> {
+  async findByConcours(concoursId: string): Promise<Equipe[]> {
+    const concours = await this.prisma.concours.findUnique({
+      where: { id: concoursId },
+      select: { modeConstitution: true },
+    });
+
     return this.prisma.equipe.findMany({
-      where: { concoursId },
+      where: {
+        concoursId,
+        tour: concours?.modeConstitution === 'MELEE_DEMELEE' ? null : undefined,
+      },
       include: { joueurs: { include: { joueur: true } } },
       orderBy: { numeroTirage: 'asc' },
     });
@@ -27,13 +36,19 @@ export class EquipesService {
     return equipe;
   }
 
-  async inscrire(dto: CreateEquipeDto): Promise<Equipe> {
+  async inscrire(dto: CreateEquipeDto, user: JwtPayload): Promise<Equipe> {
     const concours = await this.prisma.concours.findUnique({
       where: { id: dto.concoursId },
       include: { equipes: true },
     });
     if (!concours) throw new NotFoundException('Concours introuvable');
-    if (concours.statut !== StatutConcours.INSCRIPTION) {
+    
+    const canRegisterLate = user.role === Role.SUPER_ADMIN || user.role === Role.ORGANISATEUR;
+    
+    if (concours.statut === StatutConcours.TERMINE) {
+      throw new BadRequestException('Le concours est terminé');
+    }
+    if (concours.statut !== StatutConcours.INSCRIPTION && !canRegisterLate) {
       throw new BadRequestException('Les inscriptions sont fermées');
     }
     if (concours.maxParticipants && concours.equipes.length >= concours.maxParticipants) {
@@ -60,6 +75,7 @@ export class EquipesService {
         concoursId: dto.concoursId,
         nom: dto.nom,
         numeroTirage,
+        statut: concours.statut === StatutConcours.EN_COURS ? StatutEquipe.PRESENTE : StatutEquipe.INSCRITE,
         joueurs: {
           create: dto.joueurIds.map((joueurId) => ({ joueurId })),
         },

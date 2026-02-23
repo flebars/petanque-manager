@@ -38,21 +38,21 @@ export class ConcoursController {
     @Body() dto: UpdateConcoursDto,
     @CurrentUser() user: JwtPayload,
   ): Promise<Concours> {
-    return this.concoursService.update(id, dto, user.sub);
+    return this.concoursService.update(id, dto, user.sub, user.role);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentUser() user: JwtPayload): Promise<void> {
-    return this.concoursService.remove(id, user.sub);
+    return this.concoursService.remove(id, user.sub, user.role);
   }
 
   @Post(':id/demarrer')
   demarrer(@Param('id') id: string, @CurrentUser() user: JwtPayload): Promise<Concours> {
-    return this.concoursService.demarrer(id, user.sub);
+    return this.concoursService.demarrer(id, user.sub, user.role);
   }
 
   @Post(':id/terminer')
   terminer(@Param('id') id: string, @CurrentUser() user: JwtPayload): Promise<Concours> {
-    return this.concoursService.terminer(id, user.sub);
+    return this.concoursService.terminer(id, user.sub, user.role);
   }
 }

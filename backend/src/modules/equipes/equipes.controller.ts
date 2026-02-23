@@ -6,6 +6,8 @@ import { EquipesService } from './equipes.service';
 import { CreateEquipeDto } from './dto/create-equipe.dto';
 import { UpdateStatutEquipeDto } from './dto/update-statut-equipe.dto';
 import { Equipe } from '@prisma/client';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import type { JwtPayload } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('equipes')
 @UseGuards(AuthGuard('jwt'))
@@ -23,8 +25,8 @@ export class EquipesController {
   }
 
   @Post()
-  inscrire(@Body() dto: CreateEquipeDto): Promise<Equipe> {
-    return this.equipesService.inscrire(dto);
+  inscrire(@Body() dto: CreateEquipeDto, @CurrentUser() user: JwtPayload): Promise<Equipe> {
+    return this.equipesService.inscrire(dto, user);
   }
 
   @Patch(':id/statut')

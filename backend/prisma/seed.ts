@@ -339,6 +339,68 @@ async function main(): Promise<void> {
 
   console.log(`  ✓ Concours 3 "${concours3.nom}": terminé avec classement final`);
 
+  // ─── Concours 4 : INSCRIPTION (Mêlée-Démêlée Triplette, 34 joueurs) ─────────
+  const joueurHash = await bcrypt.hash('joueur1234', 10);
+  const extraJoueurs = [];
+  for (let i = 0; i < 18; i++) {
+    const email = `joueur${i + 17}@petanque.fr`;
+    const j = await prisma.joueur.upsert({
+      where: { email },
+      update: {},
+      create: {
+        email,
+        passwordHash: joueurHash,
+        nom: `Nom${i + 17}`,
+        prenom: `Prenom${i + 17}`,
+        genre: i % 2 === 0 ? Genre.H : Genre.F,
+        categorie: Categorie.SENIOR,
+        club: ['Marseille PC', 'Toulon Boules', 'Nice Pétanque'][i % 3],
+        role: Role.CAPITAINE,
+        licenceFfpjp: `FFPJP-${String(200 + i).padStart(6, '0')}`,
+      },
+    });
+    extraJoueurs.push(j);
+  }
+
+  const concours4 = await prisma.concours.create({
+    data: {
+      nom: 'Tournoi Mêlée-Démêlée Test - 34 joueurs',
+      lieu: 'Test Arena',
+      format: FormatConcours.MELEE,
+      typeEquipe: TypeEquipe.TRIPLETTE,
+      modeConstitution: ModeConstitution.MELEE_DEMELEE,
+      statut: 'INSCRIPTION',
+      nbTerrains: 6,
+      dateDebut: new Date('2026-03-01T09:00:00'),
+      dateFin: new Date('2026-03-01T18:00:00'),
+      params: { nbTours: 7 },
+      organisateurId: organisateur.id,
+    },
+  });
+
+  for (let i = 1; i <= 6; i++) {
+    await prisma.terrain.create({
+      data: { concoursId: concours4.id, numero: i },
+    });
+  }
+
+  const allJoueurs34 = [...joueurs, ...extraJoueurs];
+  for (let i = 0; i < allJoueurs34.length; i++) {
+    const j = allJoueurs34[i];
+    await prisma.equipe.create({
+      data: {
+        concoursId: concours4.id,
+        numeroTirage: i + 1,
+        statut: StatutEquipe.INSCRITE,
+        joueurs: {
+          create: [{ joueurId: j.id }],
+        },
+      },
+    });
+  }
+
+  console.log(`  ✓ Concours 4 "${concours4.nom}": 34 joueurs inscrits (MELEE_DEMELEE)`);
+
   console.log('\n✅ Seed terminé.\n');
   console.log('─────────────────────────────────────────────');
   console.log('  Comptes de test :');
