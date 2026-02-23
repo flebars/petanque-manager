@@ -329,7 +329,7 @@ export class PartiesService {
           tour,
           seed,
           contraintes: { eviterMemeClub: tour <= 2 },
-          appariements: result.appariements,
+          appariements: result.appariements as any,
         },
       });
 
