@@ -56,6 +56,9 @@ export class PartiesService {
 
   async demarrer(id: string): Promise<Partie> {
     const partie = await this.findOne(id);
+    if (partie.statut === StatutPartie.A_MONTER) {
+      throw new BadRequestException('Cette partie est en attente de ses participants');
+    }
     if (partie.statut !== StatutPartie.A_JOUER) {
       throw new BadRequestException('La partie ne peut pas être démarrée');
     }
@@ -67,11 +70,11 @@ export class PartiesService {
 
   async saisirScore(id: string, dto: SaisirScoreDto): Promise<Partie> {
     const partie = await this.findOne(id);
-    if (
-      partie.statut !== StatutPartie.EN_COURS &&
-      partie.statut !== StatutPartie.A_JOUER
-    ) {
-      throw new BadRequestException('Score non modifiable dans cet état');
+    if (partie.statut === StatutPartie.A_MONTER) {
+      throw new BadRequestException('Cette partie est en attente de ses participants');
+    }
+    if (partie.statut !== StatutPartie.EN_COURS) {
+      throw new BadRequestException('Le score ne peut être saisi que sur une partie en cours');
     }
 
     const { scoreA, scoreB } = dto;
@@ -122,6 +125,9 @@ export class PartiesService {
 
   async forfaitAvantMatch(id: string, equipeForFaitId: string): Promise<Partie> {
     const partie = await this.findOne(id);
+    if (partie.statut === StatutPartie.A_MONTER) {
+      throw new BadRequestException('Cette partie est en attente de ses participants');
+    }
     if (partie.statut !== StatutPartie.A_JOUER) {
       throw new BadRequestException('Forfait avant match impossible dans cet état');
     }
@@ -162,6 +168,9 @@ export class PartiesService {
 
   async forfaitEnCours(id: string): Promise<Partie> {
     const partie = await this.findOne(id);
+    if (partie.statut === StatutPartie.A_MONTER) {
+      throw new BadRequestException('Cette partie est en attente de ses participants');
+    }
     if (partie.statut !== StatutPartie.EN_COURS) {
       throw new BadRequestException('La partie n\'est pas en cours');
     }
@@ -177,6 +186,9 @@ export class PartiesService {
 
   async signalerLitige(id: string, dto: LitigeDto): Promise<Partie> {
     const partie = await this.findOne(id);
+    if (partie.statut === StatutPartie.A_MONTER) {
+      throw new BadRequestException('Cette partie est en attente de ses participants');
+    }
     if (partie.statut !== StatutPartie.EN_COURS) {
       throw new BadRequestException('La partie n\'est pas en cours');
     }

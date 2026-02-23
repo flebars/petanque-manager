@@ -1,13 +1,18 @@
 import { useMemo, useState } from 'react';
-import { MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { MapPin, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { Partie } from '@/types';
-import { nomEquipe } from '@/lib/utils';
+import { nomEquipe, isTbdTeam } from '@/lib/utils';
 import { Badge } from '@/components/common/Badge';
+import { Button } from '@/components/common/Button';
 import { cn } from '@/lib/utils';
+import { partiesApi } from '@/api/parties';
 
 interface BracketViewProps {
   parties: Partie[];
   type: 'COUPE_PRINCIPALE' | 'COUPE_CONSOLANTE';
+  concoursId: string;
   onMatchClick?: (match: Partie) => void;
 }
 
@@ -66,7 +71,7 @@ function calculateMaxBracketRonde(firstRoundMatchCount: number, minRound: number
   return minRound + rounds;
 }
 
-export function BracketView({ parties, type, onMatchClick }: BracketViewProps) {
+export function BracketView({ parties, type, concoursId, onMatchClick }: BracketViewProps) {
   const { rounds, allRoundKeys, minRound, maxRound } = useMemo(() => {
     const grouped: GroupedRounds = {};
     
@@ -212,16 +217,23 @@ export function BracketView({ parties, type, onMatchClick }: BracketViewProps) {
                 key={isPlaceholder(match) ? match.id : match.id}
                 className={cn(
                   'bracket-match',
-                  !isPlaceholder(match) && match.statut === 'EN_COURS' && 'bracket-match-active',
+                  !isPlaceholder(match) && match.statut === 'EN_COURS' && 'bracket-match-active cursor-pointer',
                   !isPlaceholder(match) && match.statut === 'TERMINEE' && 'bracket-match-finished',
                   isPlaceholder(match) && 'bracket-match-placeholder',
                 )}
-                onClick={() => !isPlaceholder(match) && onMatchClick?.(match)}
+                onClick={() => !isPlaceholder(match) && match.statut === 'EN_COURS' && onMatchClick?.(match)}
               >
                 {isPlaceholder(match) ? (
-                  <PlaceholderMatchCard placeholder={match} />
+                  <PlaceholderMatchCard 
+                    placeholder={match} 
+                    isFinale={activeRound === 6 && (match.bracketPos === 0 || match.bracketPos === 1)}
+                  />
                 ) : (
-                  <BracketMatchCard match={match} isFinale={match.bracketPos === 0 || match.bracketPos === 1} />
+                  <BracketMatchCard 
+                    match={match}
+                    concoursId={concoursId}
+                    isFinale={match.bracketRonde === 6 && (match.bracketPos === 0 || match.bracketPos === 1)} 
+                  />
                 )}
               </div>
             ))}
@@ -243,9 +255,18 @@ export function BracketView({ parties, type, onMatchClick }: BracketViewProps) {
                   className="bracket-match bracket-match-placeholder cursor-default"
                 >
                   {isPlaceholder(match) ? (
-                    <PlaceholderMatchCard placeholder={match} showProjectionLabel />
+                    <PlaceholderMatchCard 
+                      placeholder={match} 
+                      showProjectionLabel 
+                      isFinale={(activeRound + 1) === 6 && (match.bracketPos === 0 || match.bracketPos === 1)}
+                    />
                   ) : (
-                    <BracketMatchCard match={match} isFinale={match.bracketPos === 0 || match.bracketPos === 1} preview />
+                    <BracketMatchCard 
+                      match={match}
+                      concoursId={concoursId}
+                      isFinale={match.bracketRonde === 6 && (match.bracketPos === 0 || match.bracketPos === 1)} 
+                      preview 
+                    />
                   )}
                 </div>
               ))}
@@ -259,25 +280,13 @@ export function BracketView({ parties, type, onMatchClick }: BracketViewProps) {
 
 function getRoundLabel(ronde: string, matches: Partie[]): string {
   const roundNum = parseInt(ronde);
-  
-  const finalsMatches = matches.filter(m => m.bracketPos === 0 || m.bracketPos === 1);
-  const hasGrandeFinale = finalsMatches.some(m => m.bracketPos === 0);
-  const hasPetiteFinale = finalsMatches.some(m => m.bracketPos === 1);
-  
-  if (hasGrandeFinale && hasPetiteFinale && finalsMatches.length === 2) {
-    return 'Finales';
-  }
-  
-  if (hasGrandeFinale || hasPetiteFinale) {
-    return 'Finale';
-  }
-  
   const matchCount = matches.length;
-  if (matchCount === 2) {
-    return 'Demi-finales';
-  }
   
   switch (roundNum) {
+    case 6:
+      return matchCount === 2 ? 'Finales' : 'Finale';
+    case 5:
+      return 'Demi-finales';
     case 4:
       return 'Quarts de finale';
     case 3:
@@ -313,15 +322,34 @@ function getRoundShortLabel(round: number): string {
 
 interface BracketMatchCardProps {
   match: Partie;
+  concoursId: string;
   isFinale?: boolean;
   preview?: boolean;
 }
 
-function BracketMatchCard({ match, isFinale = false, preview = false }: BracketMatchCardProps) {
+function BracketMatchCard({ match, concoursId, isFinale = false, preview = false }: BracketMatchCardProps) {
+  const queryClient = useQueryClient();
   const { equipeA, equipeB, scoreA, scoreB, statut, terrain } = match;
 
-  const isBye = match.equipeAId === match.equipeBId;
-  const isPlaceholder = isBye && statut === 'A_JOUER' && (scoreA === null || scoreA === undefined);
+  const demarrerMutation = useMutation({
+    mutationFn: () => partiesApi.demarrer(match.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parties', concoursId] });
+      toast.success('Partie démarrée');
+    },
+    onError: () => toast.error('Impossible de démarrer la partie'),
+  });
+
+  // Check if it's a real bye match (same team ID, not TBD placeholders)
+  const isBye = match.equipeAId === match.equipeBId && !isTbdTeam(equipeA);
+  
+  // Check if both teams are TBD (waiting for both teams)
+  const bothTbd = isTbdTeam(equipeA) && isTbdTeam(equipeB);
+  
+  // Placeholder means waiting for opponent (one real team, one TBD)
+  const isPlaceholder = !isBye && !bothTbd && 
+    (isTbdTeam(equipeA) || isTbdTeam(equipeB)) && 
+    statut === 'A_MONTER';
   
   const winner =
     !isBye && scoreA !== null && scoreB !== null && scoreA !== undefined && scoreB !== undefined
@@ -335,10 +363,9 @@ function BracketMatchCard({ match, isFinale = false, preview = false }: BracketM
   const isGrandeFinale = isFinale && match.bracketPos === 0;
   const isPetiteFinale = isFinale && match.bracketPos === 1;
   
-  const hasTeamA = equipeA && equipeA.id;
-  const hasTeamB = equipeB && equipeB.id;
-  const hasBothRealTeams = hasTeamA && hasTeamB && !isPlaceholder;
-  const isReady = hasBothRealTeams && terrain && statut === 'A_JOUER';
+  const hasTeamA = equipeA && equipeA.id && !isTbdTeam(equipeA);
+  const hasTeamB = equipeB && equipeB.id && !isTbdTeam(equipeB);
+  const hasBothRealTeams = hasTeamA && hasTeamB;
 
   return (
     <div className="space-y-1">
@@ -371,7 +398,7 @@ function BracketMatchCard({ match, isFinale = false, preview = false }: BracketM
         )}
       </div>
 
-      {isBye && !isPlaceholder ? (
+      {isBye ? (
         <div className="text-center py-2">
           <div className={cn("bracket-team", preview ? "" : "bracket-team-winner")}>
             <span className="bracket-team-name">{nomEquipe(equipeA!)}</span>
@@ -382,6 +409,17 @@ function BracketMatchCard({ match, isFinale = false, preview = false }: BracketM
             )}
           </div>
         </div>
+      ) : bothTbd ? (
+        <>
+          <div className="bracket-team bracket-team-placeholder">
+            <span className="bracket-team-name text-dark-200 italic">À déterminer</span>
+            <span className="bracket-team-score text-dark-300">-</span>
+          </div>
+          <div className="bracket-team bracket-team-placeholder">
+            <span className="bracket-team-name text-dark-200 italic">À déterminer</span>
+            <span className="bracket-team-score text-dark-300">-</span>
+          </div>
+        </>
       ) : isPlaceholder ? (
         <>
           <div className="bracket-team">
@@ -397,25 +435,31 @@ function BracketMatchCard({ match, isFinale = false, preview = false }: BracketM
         <>
           <div className={cn('bracket-team', winner === 'A' && !preview && 'bracket-team-winner')}>
             <span className="bracket-team-name">
-              {hasTeamA ? nomEquipe(equipeA!) : <span className="text-dark-200 italic">En attente</span>}
+              {hasTeamA ? nomEquipe(equipeA!) : <span className="text-dark-200 italic">À déterminer</span>}
             </span>
             <span className="bracket-team-score">{preview ? '-' : (scoreA ?? '-')}</span>
           </div>
 
           <div className={cn('bracket-team', winner === 'B' && !preview && 'bracket-team-winner')}>
             <span className="bracket-team-name">
-              {hasTeamB ? nomEquipe(equipeB!) : <span className="text-dark-200 italic">En attente</span>}
+              {hasTeamB ? nomEquipe(equipeB!) : <span className="text-dark-200 italic">À déterminer</span>}
             </span>
             <span className="bracket-team-score">{preview ? '-' : (scoreB ?? '-')}</span>
           </div>
         </>
       )}
 
-      {!preview && isReady && (
-        <div className="text-center mt-1">
-          <Badge variant="green" size="sm">
-            Prêt à jouer
-          </Badge>
+      {!preview && hasBothRealTeams && statut === 'A_JOUER' && (
+        <div className="mt-2 pt-2 border-t border-dark-300" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="sm"
+            variant="success"
+            className="w-full"
+            onClick={() => demarrerMutation.mutate()}
+            loading={demarrerMutation.isPending}
+          >
+            <Play size={13} /> Démarrer
+          </Button>
         </div>
       )}
       {!preview && statut === 'EN_COURS' && (
@@ -425,7 +469,7 @@ function BracketMatchCard({ match, isFinale = false, preview = false }: BracketM
           </Badge>
         </div>
       )}
-      {!preview && statut === 'A_JOUER' && !isReady && hasBothRealTeams && (
+      {!preview && statut === 'A_JOUER' && !hasBothRealTeams && (
         <div className="text-center mt-1">
           <Badge variant="gray" size="sm">
             À jouer
@@ -439,11 +483,12 @@ function BracketMatchCard({ match, isFinale = false, preview = false }: BracketM
 interface PlaceholderMatchCardProps {
   placeholder: PlaceholderMatch;
   showProjectionLabel?: boolean;
+  isFinale?: boolean;
 }
 
-function PlaceholderMatchCard({ placeholder, showProjectionLabel = false }: PlaceholderMatchCardProps) {
-  const isGrandeFinale = placeholder.bracketPos === 0;
-  const isPetiteFinale = placeholder.bracketPos === 1;
+function PlaceholderMatchCard({ placeholder, showProjectionLabel = false, isFinale = false }: PlaceholderMatchCardProps) {
+  const isGrandeFinale = isFinale && placeholder.bracketPos === 0;
+  const isPetiteFinale = isFinale && placeholder.bracketPos === 1;
 
   return (
     <div className="space-y-1">

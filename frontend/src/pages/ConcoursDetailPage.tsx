@@ -351,6 +351,7 @@ export default function ConcoursDetailPage(): JSX.Element {
                     <BracketView
                       parties={parties.filter((p) => p.type === 'COUPE_PRINCIPALE')}
                       type="COUPE_PRINCIPALE"
+                      concoursId={id!}
                       onMatchClick={(match) => setSelectedBracketMatch(match)}
                     />
                   )}
@@ -361,6 +362,7 @@ export default function ConcoursDetailPage(): JSX.Element {
                         <BracketView
                           parties={parties.filter((p) => p.type === 'COUPE_CONSOLANTE')}
                           type="COUPE_CONSOLANTE"
+                          concoursId={id!}
                           onMatchClick={(match) => setSelectedBracketMatch(match)}
                         />
                       ) : (
