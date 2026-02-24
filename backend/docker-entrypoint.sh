@@ -41,4 +41,4 @@ seed()
 " || true
 
 echo "Starting application..."
-exec node -r tsconfig-paths/register dist/main
+exec node dist/main

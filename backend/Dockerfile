@@ -22,7 +22,6 @@ COPY prisma.config.js ./prisma.config.js
 RUN npx prisma generate
 
 COPY --from=builder /app/dist ./dist
-COPY tsconfig.json ./tsconfig.json
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh
 
