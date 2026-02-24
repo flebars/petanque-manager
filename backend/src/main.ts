@@ -11,6 +11,8 @@ async function bootstrap(): Promise<void> {
       'http://127.0.0.1:5173',
       'http://localhost:5174',
       'http://127.0.0.1:5174',
+      'https://petanque-manager.fr',
+      'http://petanque-manager.fr',
       ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
     ],
     credentials: true,
