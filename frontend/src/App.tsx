@@ -7,10 +7,20 @@ import ConcoursListPage from '@/pages/ConcoursListPage';
 import ConcoursCreatePage from '@/pages/ConcoursCreatePage';
 import ConcoursDetailPage from '@/pages/ConcoursDetailPage';
 import PublicDisplayPage from '@/pages/PublicDisplayPage';
+import AdminLayout from '@/pages/admin/AdminLayout';
+import AdminUsersPage from '@/pages/admin/AdminUsersPage';
+import AdminSettingsPage from '@/pages/admin/AdminSettingsPage';
+import AdminAuditPage from '@/pages/admin/AdminAuditPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }): JSX.Element {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }): JSX.Element {
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  return isSuperAdmin ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 export default function App(): JSX.Element {
@@ -31,6 +41,19 @@ export default function App(): JSX.Element {
           <Route path="concours" element={<ConcoursListPage />} />
           <Route path="concours/nouveau" element={<ConcoursCreatePage />} />
           <Route path="concours/:id/*" element={<ConcoursDetailPage />} />
+          
+          <Route
+            path="admin"
+            element={
+              <AdminRoute>
+                <AdminLayout />
+              </AdminRoute>
+            }
+          >
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
+            <Route path="audit" element={<AdminAuditPage />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

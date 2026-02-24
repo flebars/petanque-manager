@@ -10,6 +10,7 @@ import { PartiesModule } from './modules/parties/parties.module';
 import { ClassementModule } from './modules/classement/classement.module';
 import { PdfModule } from './modules/pdf/pdf.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -25,6 +26,7 @@ import { HealthController } from './health.controller';
     ClassementModule,
     PdfModule,
     GatewayModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })
