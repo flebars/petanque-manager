@@ -1,16 +1,6 @@
 #!/bin/sh
 set -e
 
-echo "=== DEBUG ==="
-echo "Working directory: $(pwd)"
-echo "--- prisma.config.js ---"
-cat /app/prisma.config.js
-echo "--- prisma/schema.prisma (first 10 lines) ---"
-head -10 /app/prisma/schema.prisma
-echo "--- prisma/migrations ---"
-ls /app/prisma/migrations/
-echo "=== END DEBUG ==="
-
 echo "Running database migrations..."
 npx prisma migrate deploy --schema /app/prisma/schema.prisma
 
