@@ -17,6 +17,6 @@ RUN chmod +x /docker-entrypoint.sh
 
 COPY nginx.conf /etc/nginx/nginx.conf.template
 
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["/docker-entrypoint.sh"]
