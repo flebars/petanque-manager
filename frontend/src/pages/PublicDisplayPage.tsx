@@ -10,28 +10,33 @@ import { Spinner } from '@/components/common/Spinner';
 import { ConvocationBanner } from '@/components/public/ConvocationBanner';
 import { PublicMatchGrid } from '@/components/public/PublicMatchGrid';
 import { PublicPodiumView } from '@/components/public/PublicPodiumView';
+import { PublicPouleView } from '@/components/public/PublicPouleView';
 import { ClassementTable } from '@/components/classement/ClassementTable';
 import { cn } from '@/lib/utils';
 import { Pause, Play } from 'lucide-react';
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? 'http://localhost:3000';
 
-type View = 'parties' | 'podium' | 'classement';
+type View = 'parties' | 'poules' | 'podium' | 'classement';
 
 const VIEW_DURATIONS: Record<View, number> = {
   parties: 15_000,
+  poules: 12_000,
   podium: 10_000,
   classement: 10_000,
 };
 
 const VIEW_LABELS: Record<View, string> = {
   parties: 'Parties',
+  poules: 'Poules',
   podium: 'Podium',
   classement: 'Classement',
 };
 
 function semiFinalsDone(parties: Partie[]): boolean {
-  const principaleParties = parties.filter((p) => p.type === 'COUPE_PRINCIPALE');
+  const principaleParties = parties.filter(
+    (p) => p.type === 'COUPE_PRINCIPALE' || p.type === 'CHAMPIONNAT_FINALE'
+  );
   if (principaleParties.length === 0) return false;
   const maxRonde = Math.max(...principaleParties.map((p) => p.bracketRonde ?? 0));
   if (maxRonde < 5) return false;
@@ -48,12 +53,12 @@ function getSmartDefaultView(
   parties: Partie[],
   podiumVisible: boolean,
 ): View {
-  if (concours.format === 'COUPE' && podiumVisible) {
+  if ((concours.format === 'COUPE' || concours.format === 'CHAMPIONNAT') && podiumVisible) {
     const maxRonde = Math.max(
-      ...parties.filter((p) => p.type === 'COUPE_PRINCIPALE').map((p) => p.bracketRonde ?? 0),
+      ...parties.filter((p) => p.type === 'COUPE_PRINCIPALE' || p.type === 'CHAMPIONNAT_FINALE').map((p) => p.bracketRonde ?? 0),
     );
     const finalesDone = parties.some(
-      (p) => p.type === 'COUPE_PRINCIPALE' && p.bracketRonde === maxRonde && p.bracketPos === 0 &&
+      (p) => (p.type === 'COUPE_PRINCIPALE' || p.type === 'CHAMPIONNAT_FINALE') && p.bracketRonde === maxRonde && p.bracketPos === 0 &&
         (p.statut === 'TERMINEE' || p.statut === 'FORFAIT'),
     );
     if (finalesDone) return 'podium';
@@ -124,16 +129,22 @@ export default function PublicDisplayPage(): JSX.Element {
   }, [tours.length]);
 
   const podiumVisible = useMemo(
-    () => concours?.format === 'COUPE' && semiFinalsDone(parties),
+    () => (concours?.format === 'COUPE' || concours?.format === 'CHAMPIONNAT') && semiFinalsDone(parties),
     [concours?.format, parties],
+  );
+
+  const poulesVisible = useMemo(
+    () => concours?.format === 'CHAMPIONNAT' && (concours?.poules?.length ?? 0) > 0,
+    [concours?.format, concours?.poules],
   );
 
   const availableViews = useMemo((): View[] => {
     const views: View[] = ['parties'];
+    if (poulesVisible) views.push('poules');
     if (podiumVisible) views.push('podium');
     views.push('classement');
     return views;
-  }, [podiumVisible]);
+  }, [poulesVisible, podiumVisible]);
 
   useEffect(() => {
     if (!concours || defaultViewInitialized.current) return;
@@ -290,6 +301,13 @@ export default function PublicDisplayPage(): JSX.Element {
               <PublicMatchGrid parties={partiesDuTour} tour={tourActif} />
             )}
           </>
+        )}
+
+        {view === 'poules' && (
+          <PublicPouleView
+            poules={concours.poules || []}
+            parties={parties.filter((p) => p.type === 'CHAMPIONNAT_POULE')}
+          />
         )}
 
         {view === 'podium' && (

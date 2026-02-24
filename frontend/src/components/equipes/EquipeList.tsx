@@ -7,7 +7,7 @@ import type { Concours, Equipe, StatutEquipe } from '@/types';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { Spinner } from '@/components/common/Spinner';
-import { nomEquipe } from '@/lib/utils';
+import { nomEquipe, isTbdTeam, isByeTeam } from '@/lib/utils';
 import { InscrireEquipeForm } from './InscrireEquipeForm';
 import { InscrireJoueurForm } from './InscrireJoueurForm';
 
@@ -46,10 +46,13 @@ export function EquipeList({ concours }: EquipeListProps): JSX.Element {
   
   const isMeleeDemelee = concours.modeConstitution === 'MELEE_DEMELEE';
 
-  const { data: equipes = [], isLoading } = useQuery<Equipe[]>({
+  const { data: equipesRaw = [], isLoading } = useQuery<Equipe[]>({
     queryKey: ['equipes', concours.id],
     queryFn: () => equipesApi.listByConcours(concours.id),
   });
+
+  // Filter out placeholder teams (__BYE__ and __TBD__)
+  const equipes = equipesRaw.filter((e) => !isByeTeam(e) && !isTbdTeam(e));
 
   // For MELEE_DEMELEE, always show individual players (teams are ephemeral per round)
   // For MELEE, show players until teams are formed, then show teams

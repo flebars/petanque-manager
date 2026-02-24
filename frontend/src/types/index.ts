@@ -34,6 +34,21 @@ export interface EquipeJoueur {
   joueur: Joueur;
 }
 
+export interface PouleEquipe {
+  pouleId: string;
+  equipeId: string;
+  equipe: Equipe;
+}
+
+export interface Poule {
+  id: string;
+  concoursId: string;
+  numero: number;
+  statut: string;
+  equipes: PouleEquipe[];
+  parties: Partie[];
+}
+
 export interface Equipe {
   id: string;
   concoursId: string;
@@ -75,6 +90,7 @@ export interface Concours {
   organisateur?: Pick<Joueur, 'id' | 'nom' | 'prenom' | 'email'>;
   equipes: Equipe[];
   terrains: Terrain[];
+  poules?: Poule[];
   createdAt: string;
 }
 

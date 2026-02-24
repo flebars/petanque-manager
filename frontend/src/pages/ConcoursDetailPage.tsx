@@ -24,6 +24,7 @@ import { Button } from '@/components/common/Button';
 import { ConcoursStatusBadge } from '@/components/concours/ConcoursStatusBadge';
 import { EquipeList } from '@/components/equipes/EquipeList';
 import { TourPanel } from '@/components/match/TourPanel';
+import { PouleView } from '@/components/match/PouleView';
 import { BracketView } from '@/components/match/BracketView';
 import { ScoreForm } from '@/components/match/ScoreForm';
 import { ClassementTable } from '@/components/classement/ClassementTable';
@@ -36,6 +37,8 @@ import {
   formatDate,
   cn,
   nomEquipe,
+  isByeTeam,
+  isTbdTeam,
 } from '@/lib/utils';
 
 type Tab = 'inscriptions' | 'parties' | 'classement' | 'podiums' | 'infos';
@@ -49,6 +52,14 @@ const MELEE_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 const COUPE_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: 'inscriptions', label: 'Inscriptions', icon: Users },
+  { id: 'parties', label: 'Parties', icon: PlayCircle },
+  { id: 'podiums', label: 'Podiums', icon: Trophy },
+  { id: 'classement', label: 'Statistiques', icon: BarChart2 },
+  { id: 'infos', label: 'Infos', icon: Info },
+];
+
+const CHAMPIONNAT_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'inscriptions', label: 'Inscriptions', icon: Users },
   { id: 'parties', label: 'Parties', icon: PlayCircle },
   { id: 'podiums', label: 'Podiums', icon: Trophy },
@@ -72,6 +83,7 @@ export default function ConcoursDetailPage(): JSX.Element {
   });
 
   const isCoupe = concours?.format === 'COUPE';
+  const isChampionnat = concours?.format === 'CHAMPIONNAT';
 
   const { data: parties = [], isLoading: loadingParties } = useQuery<Partie[]>({
     queryKey: ['parties', id],
@@ -148,6 +160,30 @@ export default function ConcoursDetailPage(): JSX.Element {
     },
   });
 
+  const lancerPhaseFinaleMutation = useMutation({
+    mutationFn: () => partiesApi.lancerPhaseFinale(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parties', id] });
+      queryClient.invalidateQueries({ queryKey: ['concours', id] });
+      toast.success('Phase finale lancée !');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erreur lors du lancement de la phase finale');
+    },
+  });
+
+  const lancerPoulesMutation = useMutation({
+    mutationFn: () => partiesApi.lancerPoules(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parties', id] });
+      queryClient.invalidateQueries({ queryKey: ['concours', id] });
+      toast.success('Poules lancées !');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erreur lors du lancement des poules');
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => concoursApi.delete(id!),
     onSuccess: () => {
@@ -183,6 +219,11 @@ export default function ConcoursDetailPage(): JSX.Element {
     allCurrentDone &&
     (nbToursConfig === 0 || nextTour <= nbToursConfig);
 
+  // Count real teams (excluding __BYE__ and __TBD__ placeholder teams)
+  const realTeamsCount = useMemo(() => {
+    return (concours?.equipes || []).filter((e) => !isByeTeam(e) && !isTbdTeam(e)).length;
+  }, [concours?.equipes]);
+
   if (loadingConcours || !concours) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -191,7 +232,7 @@ export default function ConcoursDetailPage(): JSX.Element {
     );
   }
 
-  const TABS = isCoupe ? COUPE_TABS : MELEE_TABS;
+  const TABS = isCoupe ? COUPE_TABS : isChampionnat ? CHAMPIONNAT_TABS : MELEE_TABS;
   const partiesDuTour = parties.filter((p) => p.tour === tourActif);
   const isCurrentTour = tourActif === maxTour || tours.length === 0;
   const hasConsolante = !!concours.params?.consolante;
@@ -283,7 +324,7 @@ export default function ConcoursDetailPage(): JSX.Element {
               {label}
               {tabId === 'inscriptions' && (
                 <span className="text-xs bg-dark-300 text-dark-50 rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
-                  {concours.equipes?.length ?? 0}
+                  {realTeamsCount}
                 </span>
               )}
             </button>
@@ -298,6 +339,111 @@ export default function ConcoursDetailPage(): JSX.Element {
           {loadingParties ? (
             <div className="flex justify-center py-10">
               <Spinner size="md" className="text-primary-500" />
+            </div>
+          ) : concours.format === 'CHAMPIONNAT' ? (
+            <div className="space-y-6">
+              {/* Championship Phase Selector */}
+              {parties.some((p) => p.type === 'CHAMPIONNAT_FINALE') && (
+                <div className="border-b border-dark-300">
+                  <nav className="flex gap-1 -mb-px">
+                    <button
+                      onClick={() => setActiveBracketTab('principale')}
+                      className={cn(
+                        'flex items-center gap-2 px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                        activeBracketTab === 'principale'
+                          ? 'border-primary-500 text-primary-500'
+                          : 'border-transparent text-dark-50 hover:text-gray-100 hover:border-dark-300',
+                      )}
+                    >
+                      🏆 Phase Finale
+                    </button>
+                    <button
+                      onClick={() => setActiveBracketTab('consolante')}
+                      className={cn(
+                        'flex items-center gap-2 px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                        activeBracketTab === 'consolante'
+                          ? 'border-primary-500 text-primary-500'
+                          : 'border-transparent text-dark-50 hover:text-gray-100 hover:border-dark-300',
+                      )}
+                    >
+                      📊 Poules
+                    </button>
+                  </nav>
+                </div>
+              )}
+
+              {/* Show Poules if in Poule phase or if Poule tab selected */}
+              {(!parties.some((p) => p.type === 'CHAMPIONNAT_FINALE') || activeBracketTab === 'consolante') ? (
+                <>
+                  {/* Button to launch pools if they don't exist yet */}
+                  {concours.statut === 'EN_COURS' && 
+                   (!concours.poules || concours.poules.length === 0) &&
+                   parties.filter(p => p.type === 'CHAMPIONNAT_POULE').length === 0 && (
+                    <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col items-center gap-4">
+                      <div className="text-center">
+                        <h4 className="text-lg font-bold text-gray-100">Prêt à lancer les poules</h4>
+                        <p className="text-sm text-dark-100 mt-1">
+                          Les équipes sont inscrites. Vous pouvez maintenant créer les poules et générer les matchs.
+                        </p>
+                      </div>
+                      <Button
+                        size="lg"
+                        onClick={() => {
+                          if (confirm('Lancer les poules ? Les équipes seront réparties et les matchs de poule seront créés.')) {
+                            lancerPoulesMutation.mutate();
+                          }
+                        }}
+                        loading={lancerPoulesMutation.isPending}
+                      >
+                        <Shuffle size={18} className="mr-2" />
+                        Lancer les Poules
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Button to launch final phase if all pool matches are done */}
+                  {concours.statut === 'EN_COURS' && 
+                   !parties.some((p) => p.type === 'CHAMPIONNAT_FINALE') &&
+                   parties.filter(p => p.type === 'CHAMPIONNAT_POULE').length > 0 &&
+                   parties.filter(p => p.type === 'CHAMPIONNAT_POULE').every(p => p.statut === 'TERMINEE' || p.statut === 'FORFAIT') && (
+                    <div className="p-6 bg-primary-500/10 border border-primary-500/20 rounded-xl flex flex-col items-center gap-4">
+                      <div className="text-center">
+                        <h4 className="text-lg font-bold text-gray-100">Phase de poules terminée !</h4>
+                        <p className="text-sm text-dark-100 mt-1">
+                          Toutes les rencontres sont finies. Vous pouvez maintenant lancer la phase finale par élimination.
+                        </p>
+                      </div>
+                      <Button
+                        size="lg"
+                        onClick={() => {
+                          if (confirm('Lancer la phase finale ? Les 2 premiers de chaque poule seront qualifiés.')) {
+                            lancerPhaseFinaleMutation.mutate();
+                          }
+                        }}
+                        loading={lancerPhaseFinaleMutation.isPending}
+                      >
+                        <Trophy size={18} className="mr-2" />
+                        Lancer la Phase Finale
+                      </Button>
+                    </div>
+                  )}
+
+                  <PouleView
+                    poules={concours.poules || []}
+                    parties={parties.filter((p) => p.type === 'CHAMPIONNAT_POULE')}
+                    concoursId={id!}
+                    readonly={concours.statut === 'TERMINE'}
+                  />
+                </>
+              ) : (
+                /* Show Bracket for Final Phase */
+                <BracketView
+                  parties={parties.filter((p) => p.type === 'CHAMPIONNAT_FINALE')}
+                  type="CHAMPIONNAT_FINALE"
+                  concoursId={id!}
+                  onMatchClick={(match) => setSelectedBracketMatch(match)}
+                />
+              )}
             </div>
           ) : concours.format === 'COUPE' ? (
             <div className="space-y-6">
@@ -478,7 +624,7 @@ export default function ConcoursDetailPage(): JSX.Element {
         </div>
       )}
 
-      {activeTab === 'podiums' && isCoupe && (
+      {activeTab === 'podiums' && (isCoupe || isChampionnat) && (
         <div className="flex flex-col gap-4">
           {loadingParties ? (
             <div className="flex justify-center py-10">
@@ -540,7 +686,7 @@ export default function ConcoursDetailPage(): JSX.Element {
               )}
               <InfoRow
                 label="Équipes inscrites"
-                value={`${concours.equipes?.length ?? 0}${concours.maxParticipants ? ` / ${concours.maxParticipants}` : ''}`}
+                value={`${realTeamsCount}${concours.maxParticipants ? ` / ${concours.maxParticipants}` : ''}`}
               />
             </dl>
           </div>

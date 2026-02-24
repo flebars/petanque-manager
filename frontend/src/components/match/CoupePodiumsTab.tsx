@@ -174,7 +174,10 @@ function PodiumSection({
 }
 
 export function CoupePodiumsTab({ parties, hasConsolante }: CoupePodiumsTabProps): JSX.Element {
-  const principaleParties = parties.filter((p) => p.type === 'COUPE_PRINCIPALE');
+  // Support both COUPE and CHAMPIONNAT formats
+  const principaleParties = parties.filter(
+    (p) => p.type === 'COUPE_PRINCIPALE' || p.type === 'CHAMPIONNAT_FINALE'
+  );
   const consolanteParties = parties.filter((p) => p.type === 'COUPE_CONSOLANTE');
 
   const principalePodium = extractPodium(principaleParties);

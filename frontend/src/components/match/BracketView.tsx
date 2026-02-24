@@ -11,7 +11,7 @@ import { partiesApi } from '@/api/parties';
 
 interface BracketViewProps {
   parties: Partie[];
-  type: 'COUPE_PRINCIPALE' | 'COUPE_CONSOLANTE';
+  type: 'COUPE_PRINCIPALE' | 'COUPE_CONSOLANTE' | 'CHAMPIONNAT_FINALE';
   concoursId: string;
   onMatchClick?: (match: Partie) => void;
 }
@@ -157,7 +157,7 @@ export function BracketView({ parties, type, concoursId, onMatchClick }: Bracket
     <div className="bracket-container">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-2xl font-bold text-primary-500">
-          {type === 'COUPE_PRINCIPALE' ? '🏆 Tableau Principal' : '🎖️ Consolante'}
+          {type === 'COUPE_PRINCIPALE' || type === 'CHAMPIONNAT_FINALE' ? '🏆 Phase Finale' : '🎖️ Consolante'}
         </h3>
         
         <div className="flex items-center gap-2">

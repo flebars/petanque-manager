@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PartiesService } from './parties.service';
 import { CoupeService } from './coupe.service';
+import { ChampionnatService } from './championnat.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ClassementService } from '@/modules/classement/classement.service';
 import { EventsGateway } from '@/modules/gateway/events.gateway';
@@ -47,6 +48,11 @@ const mockCoupeService = {
   progresserMatchBracket: jest.fn(),
 };
 
+const mockChampionnatService = {
+  lancerPoules: jest.fn(),
+  lancerPhaseFinale: jest.fn(),
+};
+
 describe('PartiesService - lancerTourCoupe', () => {
   let service: PartiesService;
   let coupeService: typeof mockCoupeService;
@@ -60,6 +66,7 @@ describe('PartiesService - lancerTourCoupe', () => {
       providers: [
         PartiesService,
         { provide: CoupeService, useValue: mockCoupeService },
+        { provide: ChampionnatService, useValue: mockChampionnatService },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ClassementService, useValue: mockClassementService },
         { provide: EventsGateway, useValue: mockEventsGateway },
@@ -84,4 +91,7 @@ describe('PartiesService - lancerTourCoupe', () => {
       coupeService.lancerTourCoupe.mockResolvedValue(expectedParties);
 
       const parties = await service.lancerTourCoupe(concoursId, 1);
+      expect(parties).toEqual(expectedParties);
+    });
+  });
 });

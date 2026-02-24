@@ -205,7 +205,9 @@ function PodiumSection({ title, places, size }: PodiumSectionProps): JSX.Element
 }
 
 export function PublicPodiumView({ parties, hasConsolante }: PublicPodiumViewProps): JSX.Element {
-  const principaleParties = parties.filter((p) => p.type === 'COUPE_PRINCIPALE');
+  const principaleParties = parties.filter(
+    (p) => p.type === 'COUPE_PRINCIPALE' || p.type === 'CHAMPIONNAT_FINALE'
+  );
   const consolanteParties = parties.filter((p) => p.type === 'COUPE_CONSOLANTE');
 
   const principalePodium = extractPodium(principaleParties);

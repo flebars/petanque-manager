@@ -1,11 +1,12 @@
 import {
-  Injectable, NotFoundException, BadRequestException, ForbiddenException,
+  Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, forwardRef
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateConcoursDto } from './dto/create-concours.dto';
 import { UpdateConcoursDto } from './dto/update-concours.dto';
 import { Concours, ModeConstitution, StatutConcours, FormatConcours, TypeEquipe, Role } from '@prisma/client';
 import { constituerEquipesMelee } from '@/modules/tirage/tirage.service';
+import { ChampionnatService } from '@/modules/parties/championnat.service';
 
 type ConcoursParams = {
   nbTours?: number;
@@ -21,7 +22,11 @@ const TAILLE_EQUIPE: Record<TypeEquipe, number> = {
 
 @Injectable()
 export class ConcoursService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => ChampionnatService))
+    private championnatService: ChampionnatService,
+  ) {}
 
   async findAll(): Promise<Concours[]> {
     const concours = await this.prisma.concours.findMany({
@@ -43,6 +48,18 @@ export class ConcoursService {
       include: {
         equipes: { include: { joueurs: { include: { joueur: true } } } },
         terrains: true,
+        poules: {
+          include: {
+            equipes: { include: { equipe: true } },
+            parties: {
+              include: {
+                equipeA: true,
+                equipeB: true,
+                terrain: true,
+              }
+            }
+          }
+        },
         organisateur: { select: { id: true, nom: true, prenom: true, email: true } },
       },
     });
@@ -158,6 +175,10 @@ export class ConcoursService {
         concours.typeEquipe as TypeEquipe,
         concours.modeConstitution,
       );
+    }
+
+    if (concours.format === FormatConcours.CHAMPIONNAT) {
+      await this.championnatService.lancerPoules(id);
     }
 
     return this.prisma.concours.update({

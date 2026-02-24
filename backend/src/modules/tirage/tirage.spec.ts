@@ -5,7 +5,9 @@ import {
   generateRoundRobin,
   nextPowerOfTwo,
   constituerEquipesMelee,
+  calculatePoolRankings,
   EquipeInfo,
+  PoolMatchData,
 } from './tirage.service';
 
 function makeEquipe(id: string, victoires = 0, club?: string, adversaires: string[] = []): EquipeInfo {
@@ -193,6 +195,55 @@ describe('generateBracket', () => {
       }
     }
   });
+
+  describe('preserveOrder mode', () => {
+    it('should distribute byes evenly when preserveOrder=true', () => {
+      const ids = ['Top1', 'Top2', 'Mid1', 'Mid2', 'Low1'];
+      const slots = generateBracket(ids, 'seed', true);
+      expect(slots).toHaveLength(8);
+      
+      const byes = slots.filter((s) => s.isBye);
+      expect(byes).toHaveLength(3);
+      
+      // With 3 byes in 8 slots: positions 0, 2, 5 (distributed evenly)
+      expect(slots[0].isBye).toBe(true);
+      expect(slots[2].isBye).toBe(true);
+      expect(slots[5].isBye).toBe(true);
+      
+      // Teams fill remaining positions in order
+      const teams = slots.filter(s => !s.isBye).map(s => s.equipeId);
+      expect(teams).toEqual(['Top1', 'Top2', 'Mid1', 'Mid2', 'Low1']);
+      
+      // Verify no adjacent byes
+      for (let i = 0; i < slots.length - 1; i++) {
+        if (slots[i].isBye) {
+          expect(slots[i + 1].isBye).toBe(false);
+        }
+      }
+    });
+
+    it('should shuffle teams when preserveOrder=false (default)', () => {
+      const ids = Array.from({ length: 10 }, (_, i) => `T${i}`);
+      const r1 = generateBracket(ids, 'seed1', false);
+      const r2 = generateBracket(ids, 'seed2', false);
+      
+      const teams1 = r1.filter((s) => !s.isBye).map((s) => s.equipeId);
+      const teams2 = r2.filter((s) => !s.isBye).map((s) => s.equipeId);
+      
+      expect(teams1).not.toEqual(teams2);
+    });
+
+    it('should preserve order with no byes (power of 2)', () => {
+      const ids = ['First', 'Second', 'Third', 'Fourth'];
+      const slots = generateBracket(ids, 'seed', true);
+      expect(slots).toHaveLength(4);
+      expect(slots.filter((s) => s.isBye)).toHaveLength(0);
+      expect(slots[0].equipeId).toBe('First');
+      expect(slots[1].equipeId).toBe('Second');
+      expect(slots[2].equipeId).toBe('Third');
+      expect(slots[3].equipeId).toBe('Fourth');
+    });
+  });
 });
 
 describe('generatePoolAssignments', () => {
@@ -281,5 +332,101 @@ describe('constituerEquipesMelee', () => {
     const r1 = constituerEquipesMelee(joueurs, 3, 'seed');
     const r2 = constituerEquipesMelee(joueurs, 3, 'seed');
     expect(r1).toEqual(r2);
+  });
+});
+
+describe('calculatePoolRankings', () => {
+  function makeMatch(equipeAId: string, equipeBId: string, scoreA: number, scoreB: number): PoolMatchData {
+    return { equipeAId, equipeBId, scoreA, scoreB };
+  }
+
+  it('should rank by wins first', () => {
+    const matches: PoolMatchData[] = [
+      makeMatch('A', 'B', 13, 5),
+      makeMatch('A', 'C', 13, 8),
+      makeMatch('A', 'D', 13, 2),
+      makeMatch('B', 'C', 13, 7),
+      makeMatch('B', 'D', 13, 3),
+      makeMatch('C', 'D', 13, 11),
+    ];
+    const rankings = calculatePoolRankings(matches);
+    expect(rankings[0].equipeId).toBe('A');
+    expect(rankings[0].victoires).toBe(3);
+    expect(rankings[1].equipeId).toBe('B');
+    expect(rankings[1].victoires).toBe(2);
+    expect(rankings[2].equipeId).toBe('C');
+    expect(rankings[2].victoires).toBe(1);
+    expect(rankings[3].equipeId).toBe('D');
+    expect(rankings[3].victoires).toBe(0);
+  });
+
+  it('should use quotient as tiebreaker when wins are equal', () => {
+    const matches: PoolMatchData[] = [
+      makeMatch('A', 'C', 13, 5),
+      makeMatch('A', 'D', 13, 5),
+      makeMatch('B', 'C', 13, 10),
+      makeMatch('B', 'D', 13, 10),
+    ];
+    const rankings = calculatePoolRankings(matches);
+    const aRank = rankings.find((r) => r.equipeId === 'A')!;
+    const bRank = rankings.find((r) => r.equipeId === 'B')!;
+    expect(aRank.victoires).toBe(2);
+    expect(bRank.victoires).toBe(2);
+    expect(aRank.quotient).toBeGreaterThan(bRank.quotient);
+    expect(rankings[0].equipeId).toBe('A');
+    expect(rankings[1].equipeId).toBe('B');
+  });
+
+  it('should use points scored when quotient is equal', () => {
+    const matches: PoolMatchData[] = [
+      makeMatch('A', 'C', 13, 6),
+      makeMatch('A', 'D', 13, 7),
+      makeMatch('B', 'C', 13, 6),
+      makeMatch('B', 'D', 13, 7),
+    ];
+    const rankings = calculatePoolRankings(matches);
+    const aRank = rankings.find((r) => r.equipeId === 'A')!;
+    const bRank = rankings.find((r) => r.equipeId === 'B')!;
+    expect(aRank.victoires).toBe(bRank.victoires);
+    expect(aRank.quotient).toBeCloseTo(bRank.quotient, 2);
+    expect(aRank.pointsMarques).toBe(bRank.pointsMarques);
+  });
+
+  it('should handle divide-by-zero (team with 0 points conceded)', () => {
+    const matches: PoolMatchData[] = [
+      makeMatch('A', 'B', 13, 0),
+      makeMatch('A', 'C', 13, 0),
+      makeMatch('A', 'D', 13, 0),
+    ];
+    const rankings = calculatePoolRankings(matches);
+    const aRank = rankings.find((r) => r.equipeId === 'A')!;
+    expect(aRank.pointsEncaisses).toBe(0);
+    expect(aRank.quotient).toBe(aRank.pointsMarques);
+    expect(aRank.quotient).toBe(39);
+  });
+
+  it('should handle null scores (incomplete matches)', () => {
+    const matches: PoolMatchData[] = [
+      makeMatch('A', 'B', 13, 5),
+      { equipeAId: 'A', equipeBId: 'C', scoreA: null, scoreB: null },
+      makeMatch('B', 'C', 13, 7),
+    ];
+    const rankings = calculatePoolRankings(matches);
+    const aRank = rankings.find((r) => r.equipeId === 'A')!;
+    expect(aRank.victoires).toBe(1);
+    expect(aRank.pointsMarques).toBe(13);
+  });
+
+  it('should handle forfeit scores (13-0) correctly', () => {
+    const matches: PoolMatchData[] = [
+      makeMatch('A', 'B', 13, 0),
+      makeMatch('A', 'C', 13, 5),
+      makeMatch('B', 'C', 13, 8),
+    ];
+    const rankings = calculatePoolRankings(matches);
+    const aRank = rankings.find((r) => r.equipeId === 'A')!;
+    expect(aRank.victoires).toBe(2);
+    expect(aRank.pointsMarques).toBe(26);
+    expect(aRank.pointsEncaisses).toBe(5);
   });
 });

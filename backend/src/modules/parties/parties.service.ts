@@ -8,6 +8,7 @@ import { Partie, StatutPartie, StatutEquipe, TypePartie, ModeConstitution, TypeE
 import { ClassementService } from '@/modules/classement/classement.service';
 import { EventsGateway } from '@/modules/gateway/events.gateway';
 import { CoupeService } from './coupe.service';
+import { ChampionnatService } from './championnat.service';
 import { Redis } from 'ioredis';
 
 const DRAW_LOCK_TTL = 30;
@@ -25,6 +26,7 @@ export class PartiesService {
     private classementService: ClassementService,
     private eventsGateway: EventsGateway,
     private coupeService: CoupeService,
+    private championnatService: ChampionnatService,
     @Inject('REDIS_CLIENT') private redis: Redis,
   ) {}
 
@@ -112,8 +114,10 @@ export class PartiesService {
       bracketPos: updated.bracketPos,
     });
 
-    if (concours?.format === FormatConcours.COUPE && 
-        (updated.type === TypePartie.COUPE_PRINCIPALE || updated.type === TypePartie.COUPE_CONSOLANTE)) {
+    if ((concours?.format === FormatConcours.COUPE || concours?.format === FormatConcours.CHAMPIONNAT) && 
+        (updated.type === TypePartie.COUPE_PRINCIPALE || 
+         updated.type === TypePartie.COUPE_CONSOLANTE || 
+         updated.type === TypePartie.CHAMPIONNAT_FINALE)) {
       console.log('[DEBUG] Delegating to CoupeService.progresserMatchBracket');
       await this.coupeService.progresserMatchBracket(updated);
     } else {
@@ -158,8 +162,10 @@ export class PartiesService {
       where: { id: partie.concoursId },
     });
 
-    if (concours?.format === FormatConcours.COUPE && 
-        (updated.type === TypePartie.COUPE_PRINCIPALE || updated.type === TypePartie.COUPE_CONSOLANTE)) {
+    if ((concours?.format === FormatConcours.COUPE || concours?.format === FormatConcours.CHAMPIONNAT) && 
+        (updated.type === TypePartie.COUPE_PRINCIPALE || 
+         updated.type === TypePartie.COUPE_CONSOLANTE || 
+         updated.type === TypePartie.CHAMPIONNAT_FINALE)) {
       await this.coupeService.progresserMatchBracket(updated);
     }
 
@@ -396,5 +402,13 @@ export class PartiesService {
 
   async lancerTourCoupe(concoursId: string, tour: number): Promise<Partie[]> {
     return this.coupeService.lancerTourCoupe(concoursId, tour);
+  }
+
+  async lancerPoules(concoursId: string): Promise<void> {
+    return this.championnatService.lancerPoules(concoursId);
+  }
+
+  async lancerPhaseFinale(concoursId: string): Promise<Partie[]> {
+    return this.championnatService.lancerPhaseFinale(concoursId);
   }
 }

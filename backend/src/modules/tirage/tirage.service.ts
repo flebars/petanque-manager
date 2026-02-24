@@ -154,14 +154,42 @@ export interface BracketSlot {
 export function generateBracket(
   equipeIds: string[],
   seed: string,
+  preserveOrder = false,
 ): BracketSlot[] {
   const rng = seededRng(seed);
-  const shuffled = shuffleArray(equipeIds, rng);
-  const size = nextPowerOfTwo(shuffled.length);
-  const numByes = size - shuffled.length;
+  const ordered = preserveOrder ? equipeIds : shuffleArray(equipeIds, rng);
+  const size = nextPowerOfTwo(ordered.length);
+  const numByes = size - ordered.length;
 
   if (numByes === 0) {
-    return shuffled.map((id, i) => ({ position: i, equipeId: id, isBye: false }));
+    return ordered.map((id, i) => ({ position: i, equipeId: id, isBye: false }));
+  }
+
+  if (preserveOrder) {
+    const slots: BracketSlot[] = [];
+    
+    // Distribute byes evenly to avoid adjacent byes
+    // For N byes in size slots, place them at positions: 0, size/numByes, 2*size/numByes, etc.
+    const byePositions = new Set<number>();
+    if (numByes > 0) {
+      const spacing = size / numByes;
+      for (let i = 0; i < numByes; i++) {
+        const pos = Math.floor(i * spacing);
+        byePositions.add(pos);
+      }
+    }
+    
+    // Fill slots
+    let teamIndex = 0;
+    for (let i = 0; i < size; i++) {
+      if (byePositions.has(i)) {
+        slots.push({ position: i, equipeId: null, isBye: true });
+      } else {
+        slots.push({ position: i, equipeId: ordered[teamIndex++], isBye: false });
+      }
+    }
+    
+    return slots;
   }
 
   // Distribute byes evenly so no two byes are adjacent.
@@ -182,7 +210,7 @@ export function generateBracket(
     if (byeSet.has(i)) {
       slots.push({ position: i, equipeId: null, isBye: true });
     } else {
-      slots.push({ position: i, equipeId: shuffled[teamIndex++], isBye: false });
+      slots.push({ position: i, equipeId: ordered[teamIndex++], isBye: false });
     }
   }
 
@@ -253,4 +281,76 @@ export function generateRoundRobin(equipeIds: string[]): Array<[string, string]>
     }
   }
   return pairs;
+}
+
+export interface PoolMatchData {
+  equipeAId: string;
+  equipeBId: string;
+  scoreA: number | null;
+  scoreB: number | null;
+}
+
+export interface RankingEntry {
+  equipeId: string;
+  victoires: number;
+  defaites: number;
+  pointsMarques: number;
+  pointsEncaisses: number;
+  quotient: number;
+}
+
+export function calculatePoolRankings(matches: PoolMatchData[]): RankingEntry[] {
+  const stats = new Map<string, RankingEntry>();
+
+  for (const match of matches) {
+    const { equipeAId, equipeBId, scoreA, scoreB } = match;
+
+    if (!stats.has(equipeAId)) {
+      stats.set(equipeAId, {
+        equipeId: equipeAId,
+        victoires: 0,
+        defaites: 0,
+        pointsMarques: 0,
+        pointsEncaisses: 0,
+        quotient: 0,
+      });
+    }
+    if (!stats.has(equipeBId)) {
+      stats.set(equipeBId, {
+        equipeId: equipeBId,
+        victoires: 0,
+        defaites: 0,
+        pointsMarques: 0,
+        pointsEncaisses: 0,
+        quotient: 0,
+      });
+    }
+
+    const statsA = stats.get(equipeAId)!;
+    const statsB = stats.get(equipeBId)!;
+
+    statsA.pointsMarques += scoreA || 0;
+    statsA.pointsEncaisses += scoreB || 0;
+    statsB.pointsMarques += scoreB || 0;
+    statsB.pointsEncaisses += scoreA || 0;
+
+    if ((scoreA || 0) > (scoreB || 0)) {
+      statsA.victoires++;
+      statsB.defaites++;
+    } else if ((scoreB || 0) > (scoreA || 0)) {
+      statsB.victoires++;
+      statsA.defaites++;
+    }
+  }
+
+  const rankings = Array.from(stats.values()).map((s) => {
+    s.quotient = s.pointsEncaisses === 0 ? s.pointsMarques : s.pointsMarques / s.pointsEncaisses;
+    return s;
+  });
+
+  return rankings.sort((a, b) => {
+    if (a.victoires !== b.victoires) return b.victoires - a.victoires;
+    if (a.quotient !== b.quotient) return b.quotient - a.quotient;
+    return b.pointsMarques - a.pointsMarques;
+  });
 }

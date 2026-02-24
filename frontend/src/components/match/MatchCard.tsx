@@ -16,6 +16,7 @@ interface MatchCardProps {
   partie: Partie;
   concoursId: string;
   readonly?: boolean;
+  compact?: boolean;
 }
 
 const STATUT_BADGE_VARIANT = {
@@ -27,7 +28,12 @@ const STATUT_BADGE_VARIANT = {
   FORFAIT: 'gray',
 } as const;
 
-export function MatchCard({ partie, concoursId, readonly = false }: MatchCardProps): JSX.Element {
+export function MatchCard({ 
+  partie, 
+  concoursId, 
+  readonly = false,
+  compact = false
+}: MatchCardProps): JSX.Element {
   const [showScore, setShowScore] = useState(false);
   const [showLitige, setShowLitige] = useState(false);
   const [litigeMode, setLitigeMode] = useState<'signal' | 'resoudre'>('signal');
@@ -103,7 +109,7 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
         <div className="flex items-center gap-3 mt-3">
           <div className={cn('flex-1 min-w-0', aWon && 'text-success-400', !aWon && bWon && 'text-dark-50')}>
             <p className={cn('font-medium text-sm', !aWon && !bWon ? 'text-gray-100' : '')}>{nomA}</p>
-            {equipeA?.joueurs && equipeA.joueurs.length > 0 && !isTbdTeam(equipeA) && !isByeTeam(equipeA) && (
+            {!compact && equipeA?.joueurs && equipeA.joueurs.length > 0 && !isTbdTeam(equipeA) && !isByeTeam(equipeA) && (
               <p className="text-xs text-dark-100">
                 {equipeA.joueurs.map((ej) => `${ej.joueur.prenom} ${ej.joueur.nom}`).join(', ')}
               </p>
@@ -113,7 +119,8 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
           <div className="flex items-center gap-2 shrink-0">
             <span
               className={cn(
-                'font-display font-bold text-3xl min-w-[2ch] text-right tabular-nums',
+                'font-display font-bold min-w-[2ch] text-right tabular-nums',
+                compact ? 'text-xl' : 'text-3xl',
                 aWon ? 'score-winner' : hasScore ? 'text-dark-100' : 'text-dark-300',
               )}
             >
@@ -122,7 +129,8 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
             <span className="text-dark-300 text-lg font-light">–</span>
             <span
               className={cn(
-                'font-display font-bold text-3xl min-w-[2ch] text-left tabular-nums',
+                'font-display font-bold min-w-[2ch] text-left tabular-nums',
+                compact ? 'text-xl' : 'text-3xl',
                 bWon ? 'score-winner' : hasScore ? 'text-dark-100' : 'text-dark-300',
               )}
             >
@@ -132,7 +140,7 @@ export function MatchCard({ partie, concoursId, readonly = false }: MatchCardPro
 
           <div className={cn('flex-1 min-w-0 text-right', bWon && 'text-success-400', !bWon && aWon && 'text-dark-50')}>
             <p className={cn('font-medium text-sm', !aWon && !bWon ? 'text-gray-100' : '')}>{nomB}</p>
-            {equipeB?.joueurs && equipeB.joueurs.length > 0 && !isTbdTeam(equipeB) && !isByeTeam(equipeB) && (
+            {!compact && equipeB?.joueurs && equipeB.joueurs.length > 0 && !isTbdTeam(equipeB) && !isByeTeam(equipeB) && (
               <p className="text-xs text-dark-100">
                 {equipeB.joueurs.map((ej) => `${ej.joueur.prenom} ${ej.joueur.nom}`).join(', ')}
               </p>

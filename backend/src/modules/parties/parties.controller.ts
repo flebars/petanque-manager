@@ -89,4 +89,44 @@ export class PartiesController {
 
     return this.partiesService.lancerTourCoupe(concoursId, parseInt(tour, 10));
   }
+
+  @Post('concours/:concoursId/lancer-poules')
+  async lancerPoules(
+    @Param('concoursId') concoursId: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    const concours = await this.prisma.concours.findUnique({
+      where: { id: concoursId },
+    });
+
+    if (!concours) {
+      throw new NotFoundException('Concours introuvable');
+    }
+
+    if (concours.organisateurId !== user.sub && user.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Seul l\'organisateur peut lancer les poules');
+    }
+
+    return this.partiesService.lancerPoules(concoursId);
+  }
+
+  @Post('concours/:concoursId/lancer-phase-finale')
+  async lancerPhaseFinale(
+    @Param('concoursId') concoursId: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<Partie[]> {
+    const concours = await this.prisma.concours.findUnique({
+      where: { id: concoursId },
+    });
+
+    if (!concours) {
+      throw new NotFoundException('Concours introuvable');
+    }
+
+    if (concours.organisateurId !== user.sub && user.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Seul l\'organisateur peut lancer la phase finale');
+    }
+
+    return this.partiesService.lancerPhaseFinale(concoursId);
+  }
 }
