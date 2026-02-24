@@ -17,7 +17,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY prisma ./prisma
+COPY ./prisma/* ./prisma/
 COPY prisma.config.js ./prisma.config.js
 RUN npx prisma generate
 
