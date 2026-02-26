@@ -14,6 +14,7 @@ import {
   Trash2,
   Shuffle,
   Trophy,
+  MapPin,
 } from 'lucide-react';
 import { concoursApi } from '@/api/concours';
 import { partiesApi } from '@/api/parties';
@@ -29,7 +30,9 @@ import { BracketView } from '@/components/match/BracketView';
 import { ScoreForm } from '@/components/match/ScoreForm';
 import { ClassementTable } from '@/components/classement/ClassementTable';
 import { CoupePodiumsTab } from '@/components/match/CoupePodiumsTab';
+import { TerrainList } from '@/components/terrains/TerrainList';
 import { useSocket } from '@/hooks/useSocket';
+import { useAuthStore } from '@/stores/authStore';
 import {
   FORMAT_LABELS,
   TYPE_EQUIPE_LABELS,
@@ -41,12 +44,13 @@ import {
   isTbdTeam,
 } from '@/lib/utils';
 
-type Tab = 'inscriptions' | 'parties' | 'classement' | 'podiums' | 'infos';
+type Tab = 'inscriptions' | 'parties' | 'classement' | 'podiums' | 'infos' | 'terrains';
 type BracketTab = 'principale' | 'consolante';
 
 const MELEE_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'inscriptions', label: 'Inscriptions', icon: Users },
   { id: 'parties', label: 'Parties', icon: PlayCircle },
+  { id: 'terrains', label: 'Terrains', icon: MapPin },
   { id: 'classement', label: 'Classement', icon: BarChart2 },
   { id: 'infos', label: 'Infos', icon: Info },
 ];
@@ -54,6 +58,7 @@ const MELEE_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 const COUPE_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'inscriptions', label: 'Inscriptions', icon: Users },
   { id: 'parties', label: 'Parties', icon: PlayCircle },
+  { id: 'terrains', label: 'Terrains', icon: MapPin },
   { id: 'podiums', label: 'Podiums', icon: Trophy },
   { id: 'classement', label: 'Statistiques', icon: BarChart2 },
   { id: 'infos', label: 'Infos', icon: Info },
@@ -62,6 +67,7 @@ const COUPE_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 const CHAMPIONNAT_TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'inscriptions', label: 'Inscriptions', icon: Users },
   { id: 'parties', label: 'Parties', icon: PlayCircle },
+  { id: 'terrains', label: 'Terrains', icon: MapPin },
   { id: 'podiums', label: 'Podiums', icon: Trophy },
   { id: 'classement', label: 'Statistiques', icon: BarChart2 },
   { id: 'infos', label: 'Infos', icon: Info },
@@ -76,11 +82,18 @@ export default function ConcoursDetailPage(): JSX.Element {
   const [tourActif, setTourActif] = useState(1);
   const [selectedBracketMatch, setSelectedBracketMatch] = useState<Partie | null>(null);
 
+  const user = useAuthStore((s) => s.user);
+  const hasRole = useAuthStore((s) => s.hasRole);
+
   const { data: concours, isLoading: loadingConcours } = useQuery<Concours>({
     queryKey: ['concours', id],
     queryFn: () => concoursApi.get(id!),
     enabled: !!id,
   });
+
+  const isOrganisateur = concours?.organisateurId === user?.sub;
+  const canManageTournament = isOrganisateur || hasRole('SUPER_ADMIN');
+  const canManageMatches = hasRole('SUPER_ADMIN', 'ORGANISATEUR', 'ARBITRE');
 
   const isCoupe = concours?.format === 'COUPE';
   const isChampionnat = concours?.format === 'CHAMPIONNAT';
@@ -88,7 +101,7 @@ export default function ConcoursDetailPage(): JSX.Element {
   const { data: parties = [], isLoading: loadingParties } = useQuery<Partie[]>({
     queryKey: ['parties', id],
     queryFn: () => partiesApi.listByConcours(id!),
-    enabled: !!id && (activeTab === 'parties' || activeTab === 'podiums'),
+    enabled: !!id && (activeTab === 'parties' || activeTab === 'podiums' || activeTab === 'terrains'),
   });
 
   const { data: classements = [], isLoading: loadingClassement } = useQuery({
@@ -267,7 +280,7 @@ export default function ConcoursDetailPage(): JSX.Element {
             <Tv size={14} /> Affichage public
           </Button>
 
-          {concours.statut === 'INSCRIPTION' && (
+          {canManageTournament && concours.statut === 'INSCRIPTION' && (
             <>
               <Button
                 size="sm"
@@ -291,7 +304,7 @@ export default function ConcoursDetailPage(): JSX.Element {
             </>
           )}
 
-          {concours.statut === 'EN_COURS' && (
+          {canManageTournament && concours.statut === 'EN_COURS' && (
             <Button
               size="sm"
               variant="primary"
@@ -598,13 +611,15 @@ export default function ConcoursDetailPage(): JSX.Element {
                     <p className="text-sm text-dark-50 mb-4">
                       Toutes les parties du tour {tourActif} sont terminées
                     </p>
-                    <Button
-                      onClick={() => lancerNextTourMutation.mutate()}
-                      loading={lancerNextTourMutation.isPending}
-                      variant="success"
-                    >
-                      <Shuffle size={15} /> Lancer le tour {nextTour}
-                    </Button>
+                    {canManageTournament && (
+                      <Button
+                        onClick={() => lancerNextTourMutation.mutate()}
+                        loading={lancerNextTourMutation.isPending}
+                        variant="success"
+                      >
+                        <Shuffle size={15} /> Lancer le tour {nextTour}
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -614,9 +629,11 @@ export default function ConcoursDetailPage(): JSX.Element {
                 parties={partiesDuTour}
                 isCurrentTour={isCurrentTour}
                 canLancer={
-                  (tours.length === 0 && tourActif === 1 && concours.statut === 'EN_COURS') ||
-                  (isCurrentTour && canLancerNext && tourActif === nextTour)
+                  canManageTournament &&
+                  ((tours.length === 0 && tourActif === 1 && concours.statut === 'EN_COURS') ||
+                    (isCurrentTour && canLancerNext && tourActif === nextTour))
                 }
+                canManageMatches={canManageMatches}
                 readonly={concours.statut === 'TERMINE'}
               />
             </>
@@ -646,6 +663,22 @@ export default function ConcoursDetailPage(): JSX.Element {
             <ClassementTable 
               classements={classements} 
               mode={concours.modeConstitution === 'MELEE_DEMELEE' ? 'joueur' : 'equipe'}
+            />
+          )}
+        </div>
+      )}
+
+      {activeTab === 'terrains' && (
+        <div className="flex flex-col gap-4">
+          {loadingParties ? (
+            <div className="flex justify-center py-10">
+              <Spinner size="md" className="text-primary-500" />
+            </div>
+          ) : (
+            <TerrainList
+              terrains={concours?.terrains || []}
+              parties={parties}
+              concoursId={id!}
             />
           )}
         </div>
