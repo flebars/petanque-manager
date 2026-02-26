@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Shuffle, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { Shuffle, AlertTriangle, CheckCircle2, Clock, FileDown } from 'lucide-react';
 import type { Partie } from '@/types';
 import { partiesApi } from '@/api/parties';
+import { pdfApi } from '@/api/pdf';
 import { Button } from '@/components/common/Button';
 import { MatchCard } from './MatchCard';
 
@@ -59,6 +60,14 @@ export function TourPanel({
     onError: () => toast.error(`Impossible de lancer le tour ${tour}`),
   });
 
+  const handleDownloadFiches = async (): Promise<void> => {
+    try {
+      await pdfApi.downloadFichesPartieTour(concoursId, tour);
+    } catch (error) {
+      // Error is already handled in pdfApi
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -97,15 +106,22 @@ export function TourPanel({
           )}
         </div>
 
-        {canLancer && total === 0 && !readonly && (
-          <Button
-            onClick={() => lancerMutation.mutate()}
-            loading={lancerMutation.isPending}
-            variant="primary"
-          >
-            <Shuffle size={15} /> Lancer le tour {tour}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {total > 0 && !readonly && (
+            <Button onClick={handleDownloadFiches} variant="secondary" size="sm">
+              <FileDown size={15} /> Télécharger fiches
+            </Button>
+          )}
+          {canLancer && total === 0 && !readonly && (
+            <Button
+              onClick={() => lancerMutation.mutate()}
+              loading={lancerMutation.isPending}
+              variant="primary"
+            >
+              <Shuffle size={15} /> Lancer le tour {tour}
+            </Button>
+          )}
+        </div>
       </div>
 
       {total === 0 ? (

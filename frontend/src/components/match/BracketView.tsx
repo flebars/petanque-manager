@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { MapPin, ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import { MapPin, ChevronLeft, ChevronRight, Play, FileDown } from 'lucide-react';
 import { Partie } from '@/types';
 import { nomEquipe, isTbdTeam, isByeTeam } from '@/lib/utils';
 import { Badge } from '@/components/common/Badge';
 import { Button } from '@/components/common/Button';
 import { cn } from '@/lib/utils';
 import { partiesApi } from '@/api/parties';
+import { pdfApi } from '@/api/pdf';
 
 interface BracketViewProps {
   parties: Partie[];
@@ -127,6 +128,15 @@ export function BracketView({ parties, type, concoursId, onMatchClick }: Bracket
 
   const [activeRound, setActiveRound] = useState<number>(minRound);
 
+  const handleDownloadFiches = async (): Promise<void> => {
+    try {
+      const typeParam = type === 'COUPE_CONSOLANTE' ? 'consolante' : 'principale';
+      await pdfApi.downloadFichesPartieBracket(concoursId, activeRound, typeParam);
+    } catch (error) {
+      // Error is already handled in pdfApi
+    }
+  };
+
   if (parties.length === 0) {
     if (type === 'COUPE_CONSOLANTE') {
       return (
@@ -155,54 +165,62 @@ export function BracketView({ parties, type, concoursId, onMatchClick }: Bracket
 
   return (
     <div className="bracket-container">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <h3 className="text-2xl font-bold text-primary-500">
           {type === 'COUPE_PRINCIPALE' || type === 'CHAMPIONNAT_FINALE' ? '🏆 Phase Finale' : '🎖️ Consolante'}
         </h3>
         
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveRound(Math.max(minRound, activeRound - 1))}
-            disabled={activeRound === minRound}
-            className={cn(
-              'p-2 rounded-lg transition-colors',
-              activeRound === minRound
-                ? 'text-dark-200 cursor-not-allowed'
-                : 'text-primary-400 hover:bg-dark-400'
-            )}
-          >
-            <ChevronLeft size={20} />
-          </button>
+        <div className="flex items-center gap-3">
+          {currentRoundMatches.filter(m => !isPlaceholder(m)).length > 0 && (
+            <Button onClick={handleDownloadFiches} variant="secondary" size="sm">
+              <FileDown size={14} /> Fiches ronde
+            </Button>
+          )}
           
-          <div className="flex gap-1.5">
-            {allRoundKeys.map((round) => (
-              <button
-                key={round}
-                onClick={() => setActiveRound(round)}
-                className={cn(
-                  'min-w-[2.5rem] h-10 px-3 rounded-lg text-sm font-medium transition-colors',
-                  activeRound === round
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-dark-400 text-dark-50 hover:text-gray-100'
-                )}
-              >
-                {getRoundShortLabel(round)}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveRound(Math.max(minRound, activeRound - 1))}
+              disabled={activeRound === minRound}
+              className={cn(
+                'p-2 rounded-lg transition-colors',
+                activeRound === minRound
+                  ? 'text-dark-200 cursor-not-allowed'
+                  : 'text-primary-400 hover:bg-dark-400'
+              )}
+            >
+              <ChevronLeft size={20} />
+            </button>
+            
+            <div className="flex gap-1.5">
+              {allRoundKeys.map((round) => (
+                <button
+                  key={round}
+                  onClick={() => setActiveRound(round)}
+                  className={cn(
+                    'min-w-[2.5rem] h-10 px-3 rounded-lg text-sm font-medium transition-colors',
+                    activeRound === round
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-dark-400 text-dark-50 hover:text-gray-100'
+                  )}
+                >
+                  {getRoundShortLabel(round)}
+                </button>
+              ))}
+            </div>
+            
+            <button
+              onClick={() => setActiveRound(Math.min(maxRound, activeRound + 1))}
+              disabled={activeRound === maxRound}
+              className={cn(
+                'p-2 rounded-lg transition-colors',
+                activeRound === maxRound
+                  ? 'text-dark-200 cursor-not-allowed'
+                  : 'text-primary-400 hover:bg-dark-400'
+              )}
+            >
+              <ChevronRight size={20} />
+            </button>
           </div>
-          
-          <button
-            onClick={() => setActiveRound(Math.min(maxRound, activeRound + 1))}
-            disabled={activeRound === maxRound}
-            className={cn(
-              'p-2 rounded-lg transition-colors',
-              activeRound === maxRound
-                ? 'text-dark-200 cursor-not-allowed'
-                : 'text-primary-400 hover:bg-dark-400'
-            )}
-          >
-            <ChevronRight size={20} />
-          </button>
         </div>
       </div>
 

@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
-import { PlayCircle, Users } from 'lucide-react';
+import { PlayCircle, Users, FileDown } from 'lucide-react';
 import type { Partie, Poule, Equipe } from '@/types';
 import { MatchCard } from './MatchCard';
+import { Button } from '@/components/common/Button';
+import { pdfApi } from '@/api/pdf';
 import { nomEquipe, cn } from '@/lib/utils';
 
 interface PouleViewProps {
@@ -43,6 +45,14 @@ function PouleCard({ poule, parties, concoursId, readonly }: {
       return 0;
     });
   }, [parties]);
+
+  const handleDownloadFiches = async (): Promise<void> => {
+    try {
+      await pdfApi.downloadFichesPartiePoule(poule.id, poule.numero.toString());
+    } catch (error) {
+      // Error is already handled in pdfApi
+    }
+  };
 
   const rankings = useMemo(() => {
     const stats = new Map<string, { 
@@ -97,16 +107,23 @@ function PouleCard({ poule, parties, concoursId, readonly }: {
   return (
     <div className="bg-dark-400 rounded-xl border border-dark-300 overflow-hidden flex flex-col">
       <div className="bg-dark-300 px-5 py-3 flex items-center justify-between border-b border-dark-200">
-        <h3 className="font-barlow-condensed font-bold text-xl text-gray-100 tracking-wide flex items-center gap-2">
-          <Users size={18} className="text-primary-500" />
-          Poule {poule.numero}
-        </h3>
-        <span className={cn(
-          "text-xs px-2 py-0.5 rounded-full",
-          poule.statut === 'TERMINE' ? "bg-success-500/10 text-success-500" : "bg-warning-500/10 text-warning-500"
-        )}>
-          {poule.statut === 'TERMINE' ? 'Terminée' : 'En cours'}
-        </span>
+        <div className="flex items-center gap-3">
+          <h3 className="font-barlow-condensed font-bold text-xl text-gray-100 tracking-wide flex items-center gap-2">
+            <Users size={18} className="text-primary-500" />
+            Poule {poule.numero}
+          </h3>
+          <span className={cn(
+            "text-xs px-2 py-0.5 rounded-full",
+            poule.statut === 'TERMINE' ? "bg-success-500/10 text-success-500" : "bg-warning-500/10 text-warning-500"
+          )}>
+            {poule.statut === 'TERMINE' ? 'Terminée' : 'En cours'}
+          </span>
+        </div>
+        {!readonly && parties.length > 0 && (
+          <Button onClick={handleDownloadFiches} variant="secondary" size="sm">
+            <FileDown size={14} /> Fiches ({parties.length})
+          </Button>
+        )}
       </div>
 
       <div className="p-5 flex flex-col gap-6">
