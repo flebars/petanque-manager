@@ -50,11 +50,19 @@ export class ConcoursService {
         terrains: true,
         poules: {
           include: {
-            equipes: { include: { equipe: true } },
+            equipes: { 
+              include: { 
+                equipe: {
+                  include: {
+                    joueurs: { include: { joueur: true } }
+                  }
+                }
+              }
+            },
             parties: {
               include: {
-                equipeA: true,
-                equipeB: true,
+                equipeA: { include: { joueurs: { include: { joueur: true } } } },
+                equipeB: { include: { joueurs: { include: { joueur: true } } } },
                 terrain: true,
               }
             }
