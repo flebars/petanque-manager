@@ -108,8 +108,8 @@ export default function PublicDisplayPage(): JSX.Element {
       queryClient.invalidateQueries({ queryKey: ['public', 'concours', id] });
     };
 
-    socket.on('partieUpdated', refresh);
-    socket.on('tourLance', refresh);
+    socket.on('score_valide', refresh);
+    socket.on('tour_demarre', refresh);
 
     return () => {
       socket.emit('leaveConcours', id);

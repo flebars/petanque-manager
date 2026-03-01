@@ -119,11 +119,11 @@ export default function ConcoursDetailPage(): JSX.Element {
       queryClient.invalidateQueries({ queryKey: ['classement', id] });
       queryClient.invalidateQueries({ queryKey: ['concours', id] });
     };
-    socket.on('partieUpdated', refresh);
-    socket.on('tourLance', refresh);
+    socket.on('score_valide', refresh);
+    socket.on('tour_demarre', refresh);
     return () => {
-      socket.off('partieUpdated', refresh);
-      socket.off('tourLance', refresh);
+      socket.off('score_valide', refresh);
+      socket.off('tour_demarre', refresh);
     };
   }, [socket, id, queryClient]);
 
