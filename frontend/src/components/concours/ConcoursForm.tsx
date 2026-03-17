@@ -32,9 +32,10 @@ interface ConcoursFormProps {
   defaultValues?: Partial<ConcoursFormValues>;
   onSubmit: (data: ConcoursFormValues) => Promise<void>;
   submitLabel?: string;
+  mode?: 'create' | 'edit';
 }
 
-export function ConcoursForm({ defaultValues, onSubmit, submitLabel = 'Créer le concours' }: ConcoursFormProps): JSX.Element {
+export function ConcoursForm({ defaultValues, onSubmit, submitLabel = 'Créer le concours', mode = 'create' }: ConcoursFormProps): JSX.Element {
   const {
     register,
     control,
@@ -98,105 +99,109 @@ export function ConcoursForm({ defaultValues, onSubmit, submitLabel = 'Créer le
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Controller
-          name="format"
-          control={control}
-          render={({ field }) => (
-            <Select
-              label="Format"
-              options={[
-                { value: 'MELEE', label: 'Mêlée (Swiss)' },
-                { value: 'COUPE', label: 'Coupe (Élimination)' },
-                { value: 'CHAMPIONNAT', label: 'Championnat (Poules)' },
-              ]}
-              {...field}
-              error={errors.format?.message}
+      {mode === 'create' && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Controller
+              name="format"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Format"
+                  options={[
+                    { value: 'MELEE', label: 'Mêlée (Swiss)' },
+                    { value: 'COUPE', label: 'Coupe (Élimination)' },
+                    { value: 'CHAMPIONNAT', label: 'Championnat (Poules)' },
+                  ]}
+                  {...field}
+                  error={errors.format?.message}
+                />
+              )}
             />
-          )}
-        />
-        <Controller
-          name="typeEquipe"
-          control={control}
-          render={({ field }) => (
-            <Select
-              label="Type d'équipe"
-              options={[
-                { value: 'TETE_A_TETE', label: 'Tête-à-tête (1p)' },
-                { value: 'DOUBLETTE', label: 'Doublette (2p)' },
-                { value: 'TRIPLETTE', label: 'Triplette (3p)' },
-              ]}
-              {...field}
-              error={errors.typeEquipe?.message}
+            <Controller
+              name="typeEquipe"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Type d'équipe"
+                  options={[
+                    { value: 'TETE_A_TETE', label: 'Tête-à-tête (1p)' },
+                    { value: 'DOUBLETTE', label: 'Doublette (2p)' },
+                    { value: 'TRIPLETTE', label: 'Triplette (3p)' },
+                  ]}
+                  {...field}
+                  error={errors.typeEquipe?.message}
+                />
+              )}
             />
-          )}
-        />
-        <Controller
-          name="modeConstitution"
-          control={control}
-          render={({ field }) => (
-            <Select
-              label="Constitution des équipes"
-              options={[
-                { value: 'MELEE_DEMELEE', label: 'Mêlée-Démêlée' },
-                { value: 'MELEE', label: 'Mêlée' },
-                { value: 'MONTEE', label: 'Montée' },
-              ]}
-              {...field}
-              error={errors.modeConstitution?.message}
+            <Controller
+              name="modeConstitution"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Constitution des équipes"
+                  options={[
+                    { value: 'MELEE_DEMELEE', label: 'Mêlée-Démêlée' },
+                    { value: 'MELEE', label: 'Mêlée' },
+                    { value: 'MONTEE', label: 'Montée' },
+                  ]}
+                  {...field}
+                  error={errors.modeConstitution?.message}
+                />
+              )}
             />
-          )}
-        />
-      </div>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Input
-          label="Maximum de participants"
-          type="number"
-          min={2}
-          placeholder="Illimité"
-          {...register('maxParticipants')}
-          error={errors.maxParticipants?.message}
-        />
-        {format === 'MELEE' && (
-          <Input
-            label="Nombre de tours"
-            type="number"
-            min={1}
-            max={20}
-            {...register('nbTours')}
-            error={errors.nbTours?.message}
-          />
-        )}
-        {format === 'CHAMPIONNAT' && (
-          <Controller
-            name="taillePoule"
-            control={control}
-            render={({ field }) => (
-              <Select
-                label="Taille des poules"
-                options={[
-                  { value: '3', label: '3 équipes' },
-                  { value: '4', label: '4 équipes' },
-                  { value: '5', label: '5 équipes' },
-                ]}
-                value={String(field.value ?? '')}
-                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : '')}
-                error={errors.taillePoule?.message}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              label="Maximum de participants"
+              type="number"
+              min={2}
+              placeholder="Illimité"
+              {...register('maxParticipants')}
+              error={errors.maxParticipants?.message}
+            />
+            {format === 'MELEE' && (
+              <Input
+                label="Nombre de tours"
+                type="number"
+                min={1}
+                max={20}
+                {...register('nbTours')}
+                error={errors.nbTours?.message}
               />
             )}
-          />
-        )}
-        {format === 'COUPE' && (
-          <div className="flex flex-col gap-1 justify-center">
-            <label className="text-sm font-medium text-dark-50">Consolante</label>
-            <label className="flex items-center gap-2 cursor-pointer mt-1">
-              <input type="checkbox" {...register('consolante')} className="accent-primary-500 w-4 h-4" />
-              <span className="text-sm text-gray-100">Activer la consolante</span>
-            </label>
+            {format === 'CHAMPIONNAT' && (
+              <Controller
+                name="taillePoule"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Taille des poules"
+                    options={[
+                      { value: '3', label: '3 équipes' },
+                      { value: '4', label: '4 équipes' },
+                      { value: '5', label: '5 équipes' },
+                    ]}
+                    value={String(field.value ?? '')}
+                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : '')}
+                    error={errors.taillePoule?.message}
+                  />
+                )}
+              />
+            )}
+            {format === 'COUPE' && (
+              <div className="flex flex-col gap-1 justify-center">
+                <label className="text-sm font-medium text-dark-50">Consolante</label>
+                <label className="flex items-center gap-2 cursor-pointer mt-1">
+                  <input type="checkbox" {...register('consolante')} className="accent-primary-500 w-4 h-4" />
+                  <span className="text-sm text-gray-100">Activer la consolante</span>
+                </label>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       <div className="flex justify-end pt-2">
         <Button type="submit" size="lg" loading={isSubmitting}>

@@ -10,7 +10,7 @@ export const concoursApi = {
   create: (data: Partial<Concours> & { dateDebut: string; dateFin: string }): Promise<Concours> =>
     api.post<Concours>('/concours', data).then((r) => r.data),
 
-  update: (id: string, data: Partial<Concours>): Promise<Concours> =>
+  update: (id: string, data: Partial<Concours> | { nom?: string; dateDebut?: string; dateFin?: string; nbTerrains?: number }): Promise<Concours> =>
     api.patch<Concours>(`/concours/${id}`, data).then((r) => r.data),
 
   delete: (id: string): Promise<void> => api.delete(`/concours/${id}`).then(() => undefined),

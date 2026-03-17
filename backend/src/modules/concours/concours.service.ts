@@ -126,15 +126,83 @@ export class ConcoursService {
       throw new ForbiddenException('Accès refusé');
     }
 
+    if (dto.nbTerrains !== undefined) {
+      await this.updateTerrains(id, dto.nbTerrains);
+    }
+
     return this.prisma.concours.update({
       where: { id },
       data: {
         nom: dto.nom,
-        lieu: dto.lieu,
-        maxParticipants: dto.maxParticipants,
         dateDebut: dto.dateDebut ? new Date(dto.dateDebut) : undefined,
         dateFin: dto.dateFin ? new Date(dto.dateFin) : undefined,
+        nbTerrains: dto.nbTerrains,
       },
+    });
+  }
+
+  async updateTerrains(concoursId: string, newCount: number): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const currentTerrains = await tx.terrain.findMany({
+        where: { concoursId },
+        orderBy: { numero: 'asc' },
+      });
+
+      const currentCount = currentTerrains.length;
+
+      if (newCount > currentCount) {
+        const terrainsToCreate = Array.from(
+          { length: newCount - currentCount },
+          (_, i) => ({
+            concoursId,
+            numero: currentCount + i + 1,
+          }),
+        );
+        await tx.terrain.createMany({ data: terrainsToCreate });
+      } else if (newCount < currentCount) {
+        const terrainsToDelete = currentTerrains.slice(newCount);
+        const terrainIdsToDelete = terrainsToDelete.map((t) => t.id);
+
+        const matchesOnDeletedTerrains = await tx.partie.findMany({
+          where: { terrainId: { in: terrainIdsToDelete } },
+        });
+
+        if (matchesOnDeletedTerrains.length > 0) {
+          const remainingTerrains = currentTerrains.slice(0, newCount);
+          const terrainCounts = new Map<string, number>(
+            remainingTerrains.map((t) => [t.id, 0]),
+          );
+
+          for (const terrain of remainingTerrains) {
+            const count = await tx.partie.count({
+              where: { terrainId: terrain.id },
+            });
+            terrainCounts.set(terrain.id, count);
+          }
+
+          for (const match of matchesOnDeletedTerrains) {
+            let minTerrainId = remainingTerrains[0].id;
+            let minCount = terrainCounts.get(minTerrainId) ?? 0;
+
+            for (const [terrainId, count] of terrainCounts) {
+              if (count < minCount) {
+                minCount = count;
+                minTerrainId = terrainId;
+              }
+            }
+
+            await tx.partie.update({
+              where: { id: match.id },
+              data: { terrainId: minTerrainId },
+            });
+            terrainCounts.set(minTerrainId, minCount + 1);
+          }
+        }
+
+        await tx.terrain.deleteMany({
+          where: { id: { in: terrainIdsToDelete } },
+        });
+      }
     });
   }
 
