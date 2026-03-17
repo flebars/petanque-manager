@@ -15,6 +15,7 @@ import {
   Shuffle,
   Trophy,
   MapPin,
+  Edit,
 } from 'lucide-react';
 import { concoursApi } from '@/api/concours';
 import { partiesApi } from '@/api/parties';
@@ -31,6 +32,8 @@ import { ScoreForm } from '@/components/match/ScoreForm';
 import { ClassementTable } from '@/components/classement/ClassementTable';
 import { CoupePodiumsTab } from '@/components/match/CoupePodiumsTab';
 import { TerrainList } from '@/components/terrains/TerrainList';
+import { EditConcoursModal } from '@/components/concours/EditConcoursModal';
+import type { ConcoursFormValues } from '@/components/concours/ConcoursForm';
 import { useSocket } from '@/hooks/useSocket';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -81,6 +84,7 @@ export default function ConcoursDetailPage(): JSX.Element {
   const [activeBracketTab, setActiveBracketTab] = useState<BracketTab>('principale');
   const [tourActif, setTourActif] = useState(1);
   const [selectedBracketMatch, setSelectedBracketMatch] = useState<Partie | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const user = useAuthStore((s) => s.user);
   const hasRole = useAuthStore((s) => s.hasRole);
@@ -147,6 +151,16 @@ export default function ConcoursDetailPage(): JSX.Element {
       setActiveTab(isCoupe ? 'podiums' : 'classement');
     },
     onError: () => toast.error('Impossible de terminer le concours'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: ConcoursFormValues) => concoursApi.update(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['concours', id] });
+      queryClient.invalidateQueries({ queryKey: ['concours'] });
+      toast.success('Concours modifié avec succès');
+    },
+    onError: () => toast.error('Impossible de modifier le concours'),
   });
 
   const lancerNextTourMutation = useMutation({
@@ -723,6 +737,15 @@ export default function ConcoursDetailPage(): JSX.Element {
               />
             </dl>
           </div>
+
+          {canManageTournament && concours.statut === 'INSCRIPTION' && (
+            <div className="md:col-span-2 flex justify-center">
+              <Button onClick={() => setShowEditModal(true)} variant="secondary">
+                <Edit size={16} />
+                Modifier le concours
+              </Button>
+            </div>
+          )}
         </div>
       )}
       
@@ -738,6 +761,18 @@ export default function ConcoursDetailPage(): JSX.Element {
             setSelectedBracketMatch(null);
             queryClient.invalidateQueries({ queryKey: ['parties', id] });
             queryClient.invalidateQueries({ queryKey: ['classement', id] });
+          }}
+        />
+      )}
+
+      {/* Edit Concours Modal */}
+      {concours && (
+        <EditConcoursModal
+          open={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          concours={concours}
+          onSubmit={async (data) => {
+            await updateMutation.mutateAsync(data);
           }}
         />
       )}
