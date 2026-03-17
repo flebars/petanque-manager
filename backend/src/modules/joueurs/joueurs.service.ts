@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateJoueurDto } from './dto/create-joueur.dto';
 import { UpdateJoueurDto } from './dto/update-joueur.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { Joueur } from '@prisma/client';
+import { Joueur, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { JwtPayload } from '@/modules/auth/strategies/jwt.strategy';
 
 @Injectable()
 export class JoueursService {
@@ -37,8 +43,13 @@ export class JoueursService {
     });
   }
 
-  async update(id: string, dto: UpdateJoueurDto): Promise<Joueur> {
+  async update(id: string, dto: UpdateJoueurDto, user: JwtPayload): Promise<Joueur> {
     await this.findOne(id);
+
+    if (id !== user.sub && user.role !== Role.SUPER_ADMIN && user.role !== Role.ORGANISATEUR) {
+      throw new ForbiddenException('Vous ne pouvez modifier que votre propre profil');
+    }
+
     return this.prisma.joueur.update({
       where: { id },
       data: {

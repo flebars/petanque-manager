@@ -8,6 +8,7 @@ import { Button } from '@/components/common/Button';
 import { ConcoursCard } from '@/components/concours/ConcoursCard';
 import type { Concours, StatutConcours } from '@/types';
 import { STATUT_CONCOURS_LABELS } from '@/lib/utils';
+import { useAuthStore } from '@/stores/authStore';
 
 const ALL_STATUTS: StatutConcours[] = ['INSCRIPTION', 'EN_COURS', 'TERMINE'];
 
@@ -15,6 +16,9 @@ export default function ConcoursListPage(): JSX.Element {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [filterStatut, setFilterStatut] = useState<StatutConcours | 'ALL'>('ALL');
+  const hasRole = useAuthStore((s) => s.hasRole);
+
+  const canCreateTournament = hasRole('SUPER_ADMIN', 'ORGANISATEUR');
 
   const { data: concours = [], isLoading } = useQuery<Concours[]>({
     queryKey: ['concours'],
@@ -36,9 +40,11 @@ export default function ConcoursListPage(): JSX.Element {
           <h1 className="text-gray-100">Concours</h1>
           <p className="text-dark-50 text-sm mt-1">{concours.length} concours au total</p>
         </div>
-        <Button onClick={() => navigate('/concours/nouveau')}>
-          <Plus size={16} /> Nouveau concours
-        </Button>
+        {canCreateTournament && (
+          <Button onClick={() => navigate('/concours/nouveau')}>
+            <Plus size={16} /> Nouveau concours
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">

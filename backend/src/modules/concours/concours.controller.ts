@@ -6,11 +6,13 @@ import { ConcoursService } from './concours.service';
 import { CreateConcoursDto } from './dto/create-concours.dto';
 import { UpdateConcoursDto } from './dto/update-concours.dto';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { RolesGuard } from '@/common/guards/roles.guard';
 import { JwtPayload } from '@/modules/auth/strategies/jwt.strategy';
-import { Concours } from '@prisma/client';
+import { Concours, Role } from '@prisma/client';
 
 @Controller('concours')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 export class ConcoursController {
   constructor(private concoursService: ConcoursService) {}
 
@@ -25,6 +27,7 @@ export class ConcoursController {
   }
 
   @Post()
+  @Roles(Role.SUPER_ADMIN, Role.ORGANISATEUR)
   create(
     @Body() dto: CreateConcoursDto,
     @CurrentUser() user: JwtPayload,
