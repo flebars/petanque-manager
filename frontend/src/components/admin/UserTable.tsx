@@ -1,4 +1,4 @@
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, User } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import * as adminApi from '@/api/admin';
 import { cn } from '@/lib/utils';
@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 interface UserTableProps {
   users: adminApi.User[];
   isLoading: boolean;
+  onEditProfile: (user: adminApi.User) => void;
   onEditRole: (user: adminApi.User) => void;
   onDelete: (user: adminApi.User) => void;
 }
@@ -29,6 +30,7 @@ const roleLabels: Record<string, string> = {
 export default function UserTable({
   users,
   isLoading,
+  onEditProfile,
   onEditRole,
   onDelete,
 }: UserTableProps): JSX.Element {
@@ -92,6 +94,14 @@ export default function UserTable({
                 </td>
                 <td className="p-4">
                   <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => onEditProfile(user)}
+                      className="p-2"
+                      title="Edit profile"
+                    >
+                      <User size={16} />
+                    </Button>
                     <Button
                       variant="ghost"
                       onClick={() => onEditRole(user)}
