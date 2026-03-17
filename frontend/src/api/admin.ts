@@ -74,6 +74,17 @@ export interface UpdateRoleRequest {
   password: string;
 }
 
+export interface UpdateUserProfileRequest {
+  email?: string;
+  nom?: string;
+  prenom?: string;
+  genre?: string;
+  dateNaissance?: string;
+  licenceFfpjp?: string;
+  club?: string;
+  categorie?: string;
+}
+
 export async function getStats(): Promise<SystemStats> {
   const { data } = await api.get('/admin/stats');
   return data;
@@ -98,6 +109,14 @@ export async function updateUserRole(
   request: UpdateRoleRequest,
 ): Promise<{ message: string; user: User }> {
   const { data } = await api.patch(`/admin/users/${userId}/role`, request);
+  return data;
+}
+
+export async function updateUserProfile(
+  userId: string,
+  request: UpdateUserProfileRequest,
+): Promise<{ message: string; user: User }> {
+  const { data } = await api.patch(`/admin/users/${userId}/profile`, request);
   return data;
 }
 

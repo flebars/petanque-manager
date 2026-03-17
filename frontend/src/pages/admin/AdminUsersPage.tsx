@@ -4,6 +4,7 @@ import { Input } from '@/components/common/Input';
 import { Button } from '@/components/common/Button';
 import UserTable from '@/components/admin/UserTable';
 import RoleEditor from '@/components/admin/RoleEditor';
+import UserProfileEditor from '@/components/admin/UserProfileEditor';
 import * as adminApi from '@/api/admin';
 import toast from 'react-hot-toast';
 
@@ -11,6 +12,7 @@ export default function AdminUsersPage(): JSX.Element {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [editingUser, setEditingUser] = useState<adminApi.User | null>(null);
+  const [editingProfile, setEditingProfile] = useState<adminApi.User | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -37,6 +39,10 @@ export default function AdminUsersPage(): JSX.Element {
   };
 
   const handleRoleUpdateSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+  };
+
+  const handleProfileUpdateSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-users'] });
   };
 
@@ -70,6 +76,7 @@ export default function AdminUsersPage(): JSX.Element {
       <UserTable
         users={data?.users || []}
         isLoading={isLoading}
+        onEditProfile={setEditingProfile}
         onEditRole={setEditingUser}
         onDelete={handleDeleteUser}
       />
@@ -101,6 +108,13 @@ export default function AdminUsersPage(): JSX.Element {
         onClose={() => setEditingUser(null)}
         user={editingUser}
         onSuccess={handleRoleUpdateSuccess}
+      />
+
+      <UserProfileEditor
+        isOpen={!!editingProfile}
+        onClose={() => setEditingProfile(null)}
+        user={editingProfile}
+        onSuccess={handleProfileUpdateSuccess}
       />
     </div>
   );

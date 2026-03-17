@@ -13,6 +13,7 @@ import {
   ClearDataResponseDto,
   UpdateUserRoleDto,
   BackupDataDto,
+  AdminUpdateUserDto,
 } from './dto';
 
 @Injectable()
@@ -119,6 +120,78 @@ export class AdminService {
     );
 
     return { message: 'Role updated successfully', user: updatedUser };
+  }
+
+  async updateUserProfile(
+    userId: string,
+    dto: AdminUpdateUserDto,
+    actorId: string,
+    ipAddress?: string,
+  ) {
+    const user = await this.prisma.joueur.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (dto.email && dto.email !== user.email) {
+      const existing = await this.prisma.joueur.findUnique({
+        where: { email: dto.email },
+      });
+      if (existing) {
+        throw new BadRequestException('Email already in use');
+      }
+    }
+
+    const oldValues = {
+      email: user.email,
+      nom: user.nom,
+      prenom: user.prenom,
+      genre: user.genre,
+      dateNaissance: user.dateNaissance,
+      licenceFfpjp: user.licenceFfpjp,
+      club: user.club,
+      categorie: user.categorie,
+    };
+
+    const updatedUser = await this.prisma.joueur.update({
+      where: { id: userId },
+      data: {
+        ...dto,
+        dateNaissance: dto.dateNaissance ? new Date(dto.dateNaissance) : undefined,
+      },
+      select: {
+        id: true,
+        email: true,
+        nom: true,
+        prenom: true,
+        genre: true,
+        dateNaissance: true,
+        licenceFfpjp: true,
+        club: true,
+        categorie: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const changes: any = {};
+    Object.keys(dto).forEach((key) => {
+      if (dto[key as keyof AdminUpdateUserDto] !== undefined) {
+        changes[key] = {
+          old: oldValues[key as keyof typeof oldValues],
+          new: dto[key as keyof AdminUpdateUserDto],
+        };
+      }
+    });
+
+    await this.createAuditLog(
+      'UPDATE_USER_PROFILE',
+      actorId,
+      userId,
+      changes,
+      ipAddress,
+    );
+
+    return { message: 'User profile updated successfully', user: updatedUser };
   }
 
   async deleteUser(userId: string, actorId: string, ipAddress?: string) {

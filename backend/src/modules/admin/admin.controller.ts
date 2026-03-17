@@ -17,7 +17,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { Role } from '@prisma/client';
 import { AdminService } from './admin.service';
-import { ClearDataDto, UpdateUserRoleDto, BackupDataDto } from './dto';
+import { ClearDataDto, UpdateUserRoleDto, BackupDataDto, AdminUpdateUserDto } from './dto';
 
 @Controller('admin')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -47,6 +47,16 @@ export class AdminController {
     @Req() req: any,
   ) {
     return this.adminService.updateUserRole(id, dto, actor.sub, req.ip);
+  }
+
+  @Patch('users/:id/profile')
+  async updateUserProfile(
+    @Param('id') id: string,
+    @Body() dto: AdminUpdateUserDto,
+    @CurrentUser() actor: JwtPayload,
+    @Req() req: any,
+  ) {
+    return this.adminService.updateUserProfile(id, dto, actor.sub, req.ip);
   }
 
   @Delete('users/:id')
