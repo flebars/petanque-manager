@@ -4,9 +4,12 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateConcoursDto } from './dto/create-concours.dto';
 import { UpdateConcoursDto } from './dto/update-concours.dto';
+import { ExportConcoursDto } from './dto/export-concours.dto';
+import { ImportConcoursDto } from './dto/import-concours.dto';
 import { Concours, ModeConstitution, StatutConcours, FormatConcours, TypeEquipe, Role } from '@prisma/client';
 import { constituerEquipesMelee } from '@/modules/tirage/tirage.service';
 import { ChampionnatService } from '@/modules/parties/championnat.service';
+import { JoueursService } from '@/modules/joueurs/joueurs.service';
 
 type ConcoursParams = {
   nbTours?: number;
@@ -26,6 +29,7 @@ export class ConcoursService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => ChampionnatService))
     private championnatService: ChampionnatService,
+    private joueursService: JoueursService,
   ) {}
 
   async findAll(): Promise<Concours[]> {
@@ -326,6 +330,216 @@ export class ConcoursService {
     return this.prisma.concours.update({
       where: { id },
       data: { statut: StatutConcours.TERMINE },
+    });
+  }
+
+  async exportConcours(id: string): Promise<ExportConcoursDto> {
+    const concours = await this.prisma.concours.findUnique({
+      where: { id },
+      include: {
+        equipes: {
+          include: {
+            joueurs: { include: { joueur: true } },
+          },
+        },
+      },
+    });
+
+    if (!concours) throw new NotFoundException(`Concours ${id} introuvable`);
+
+    const equipesToExport = concours.modeConstitution === ModeConstitution.MELEE_DEMELEE
+      ? concours.equipes.filter((e) => e.tour === null)
+      : concours.equipes;
+
+    const realEquipes = equipesToExport.filter(
+      (e) => e.nom !== '__TBD__' && e.nom !== '__BYE__' && e.joueurs.length > 0,
+    );
+
+    const playerMap = new Map<string, any>();
+    realEquipes.forEach((equipe) => {
+      equipe.joueurs.forEach((ej) => {
+        if (!playerMap.has(ej.joueur.email)) {
+          playerMap.set(ej.joueur.email, {
+            email: ej.joueur.email,
+            nom: ej.joueur.nom,
+            prenom: ej.joueur.prenom,
+            genre: ej.joueur.genre,
+            dateNaissance: ej.joueur.dateNaissance?.toISOString().split('T')[0],
+            licenceFfpjp: ej.joueur.licenceFfpjp || undefined,
+            club: ej.joueur.club || undefined,
+            categorie: ej.joueur.categorie,
+          });
+        }
+      });
+    });
+
+    const exportDto: ExportConcoursDto = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      tournament: {
+        nom: concours.nom,
+        lieu: concours.lieu || undefined,
+        format: concours.format,
+        typeEquipe: concours.typeEquipe,
+        modeConstitution: concours.modeConstitution,
+        nbTerrains: concours.nbTerrains,
+        maxParticipants: concours.maxParticipants || undefined,
+        dateDebut: concours.dateDebut.toISOString(),
+        dateFin: concours.dateFin.toISOString(),
+        params: concours.params as any,
+      },
+      players: Array.from(playerMap.values()),
+    };
+
+    if (concours.modeConstitution === ModeConstitution.MONTEE) {
+      exportDto.teams = realEquipes.map((equipe) => ({
+        nom: equipe.nom || undefined,
+        playerEmails: equipe.joueurs.map((ej) => ej.joueur.email),
+      }));
+    }
+
+    return exportDto;
+  }
+
+  async importConcours(dto: ImportConcoursDto, organisateurId: string): Promise<Concours> {
+    if (dto.version !== '1.0') {
+      throw new BadRequestException(`Version non supportée: ${dto.version}. Version attendue: 1.0`);
+    }
+
+    const taille = TAILLE_EQUIPE[dto.tournament.typeEquipe];
+
+    if (dto.tournament.modeConstitution === ModeConstitution.MONTEE) {
+      if (!dto.teams || dto.teams.length === 0) {
+        throw new BadRequestException('Le mode MONTEE nécessite des équipes pré-constituées');
+      }
+      
+      const validTeams = dto.teams.filter(
+        (team) => team.playerEmails && team.playerEmails.length > 0 && 
+        team.nom !== '__TBD__' && team.nom !== '__BYE__'
+      );
+
+      for (const team of validTeams) {
+        if (team.playerEmails.length !== taille) {
+          throw new BadRequestException(
+            `Chaque équipe doit avoir ${taille} joueur(s) pour ${dto.tournament.typeEquipe}`,
+          );
+        }
+      }
+      
+      dto.teams = validTeams;
+    } else {
+      if (dto.teams && dto.teams.length > 0) {
+        throw new BadRequestException(
+          'Les équipes pré-constituées ne sont autorisées que pour le mode MONTEE',
+        );
+      }
+    }
+
+    if (dto.players.length > 1000) {
+      throw new BadRequestException('Import limité à 1000 joueurs maximum');
+    }
+
+    const dateDebut = new Date(dto.tournament.dateDebut);
+    if (dateDebut < new Date()) {
+      console.warn(`Import d'un concours avec date de début dans le passé: ${dto.tournament.nom}`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const emailToJoueurId = new Map<string, string>();
+
+      for (const playerDto of dto.players) {
+        const joueur = await this.joueursService.findOrCreateByEmail(playerDto.email, {
+          nom: playerDto.nom,
+          prenom: playerDto.prenom,
+          genre: playerDto.genre,
+          dateNaissance: playerDto.dateNaissance as any,
+          licenceFfpjp: playerDto.licenceFfpjp,
+          club: playerDto.club,
+          categorie: playerDto.categorie,
+          role: Role.SPECTATEUR,
+        });
+        emailToJoueurId.set(playerDto.email, joueur.id);
+      }
+
+      const params: any = {};
+      if (dto.tournament.params?.nbTours) params.nbTours = dto.tournament.params.nbTours;
+      if (dto.tournament.params?.taillePoule) params.taillePoule = dto.tournament.params.taillePoule;
+      if (dto.tournament.params?.consolante !== undefined) {
+        params.consolante = dto.tournament.params.consolante;
+      }
+
+      const concours = await tx.concours.create({
+        data: {
+          nom: dto.tournament.nom,
+          lieu: dto.tournament.lieu,
+          format: dto.tournament.format,
+          typeEquipe: dto.tournament.typeEquipe,
+          modeConstitution: dto.tournament.modeConstitution,
+          nbTerrains: dto.tournament.nbTerrains,
+          maxParticipants: dto.tournament.maxParticipants,
+          dateDebut: new Date(dto.tournament.dateDebut),
+          dateFin: new Date(dto.tournament.dateFin),
+          params,
+          organisateurId,
+        },
+      });
+
+      await tx.terrain.createMany({
+        data: Array.from({ length: dto.tournament.nbTerrains }, (_, i) => ({
+          concoursId: concours.id,
+          numero: i + 1,
+        })),
+      });
+
+      if (dto.tournament.modeConstitution === ModeConstitution.MONTEE && dto.teams) {
+        for (let i = 0; i < dto.teams.length; i++) {
+          const team = dto.teams[i];
+          const joueurIds = team.playerEmails.map((email) => {
+            const joueurId = emailToJoueurId.get(email);
+            if (!joueurId) {
+              throw new BadRequestException(`Joueur avec email ${email} introuvable`);
+            }
+            return joueurId;
+          });
+
+          await tx.equipe.create({
+            data: {
+              concoursId: concours.id,
+              nom: team.nom,
+              numeroTirage: i + 1,
+              statut: 'INSCRITE',
+              joueurs: {
+                create: joueurIds.map((joueurId) => ({ joueurId })),
+              },
+            },
+          });
+        }
+      } else {
+        for (let i = 0; i < dto.players.length; i++) {
+          const joueurId = emailToJoueurId.get(dto.players[i].email);
+          if (!joueurId) continue;
+
+          await tx.equipe.create({
+            data: {
+              concoursId: concours.id,
+              numeroTirage: i + 1,
+              statut: 'INSCRITE',
+              joueurs: {
+                create: [{ joueurId }],
+              },
+            },
+          });
+        }
+      }
+
+      return tx.concours.findUnique({
+        where: { id: concours.id },
+        include: {
+          equipes: { include: { joueurs: { include: { joueur: true } } } },
+          terrains: true,
+          organisateur: { select: { id: true, nom: true, prenom: true, email: true } },
+        },
+      }) as Promise<Concours>;
     });
   }
 }

@@ -16,6 +16,7 @@ import {
   Trophy,
   MapPin,
   Edit,
+  Download,
 } from 'lucide-react';
 import { concoursApi } from '@/api/concours';
 import { partiesApi } from '@/api/parties';
@@ -221,6 +222,24 @@ export default function ConcoursDetailPage(): JSX.Element {
     onError: () => toast.error('Impossible de supprimer le concours'),
   });
 
+  const exportMutation = useMutation({
+    mutationFn: () => concoursApi.exportJson(id!),
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = `${concours?.nom.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Export réussi');
+    },
+    onError: () => toast.error('Erreur lors de l\'export'),
+  });
+
   const tours = useMemo(() => {
     const set = new Set(parties.map((p) => p.tour).filter((t): t is number => t !== undefined));
     return Array.from(set).sort((a, b) => a - b);
@@ -286,6 +305,17 @@ export default function ConcoursDetailPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {canManageTournament && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => exportMutation.mutate()}
+              loading={exportMutation.isPending}
+            >
+              <Download size={14} /> {exportMutation.isPending ? 'Export...' : 'Exporter'}
+            </Button>
+          )}
+
           <Button
             size="sm"
             variant="ghost"

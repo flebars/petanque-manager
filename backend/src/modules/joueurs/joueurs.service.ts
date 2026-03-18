@@ -83,4 +83,29 @@ export class JoueursService {
 
     return { message: 'Mot de passe modifié avec succès' };
   }
+
+  async findOrCreateByEmail(
+    email: string,
+    data: Partial<Omit<Joueur, 'id' | 'passwordHash' | 'createdAt' | 'updatedAt'>> & {
+      dateNaissance?: Date | string | null;
+    },
+  ): Promise<Joueur> {
+    const existing = await this.prisma.joueur.findUnique({ where: { email } });
+    if (existing) return existing;
+
+    return this.prisma.joueur.create({
+      data: {
+        email,
+        nom: data.nom || '',
+        prenom: data.prenom || '',
+        genre: data.genre || 'H',
+        categorie: data.categorie || 'SENIOR',
+        role: data.role || Role.SPECTATEUR,
+        passwordHash: '',
+        dateNaissance: data.dateNaissance ? new Date(data.dateNaissance) : undefined,
+        licenceFfpjp: data.licenceFfpjp,
+        club: data.club,
+      },
+    });
+  }
 }
