@@ -166,26 +166,31 @@ export function generateBracket(
   }
 
   if (preserveOrder) {
+    // Standard tournament seeding with byes for top-ranked teams
+    // In a bracket, slots are paired: (0,1), (2,3), (4,5), etc.
+    // We want top numByes teams to get byes
+    // Strategy: Place top teams in even slots, pair with bye in odd slot
+    
     const slots: BracketSlot[] = [];
-    
-    // Distribute byes evenly to avoid adjacent byes
-    // For N byes in size slots, place them at positions: 0, size/numByes, 2*size/numByes, etc.
-    const byePositions = new Set<number>();
-    if (numByes > 0) {
-      const spacing = size / numByes;
-      for (let i = 0; i < numByes; i++) {
-        const pos = Math.floor(i * spacing);
-        byePositions.add(pos);
-      }
-    }
-    
-    // Fill slots
     let teamIndex = 0;
-    for (let i = 0; i < size; i++) {
-      if (byePositions.has(i)) {
-        slots.push({ position: i, equipeId: null, isBye: true });
-      } else {
+    let byesAssigned = 0;
+    
+    for (let i = 0; i < size; i += 2) {
+      // Process pairs: slot i and slot i+1
+      if (byesAssigned < numByes) {
+        // Top team gets a bye - place team in slot i, bye in slot i+1
         slots.push({ position: i, equipeId: ordered[teamIndex++], isBye: false });
+        slots.push({ position: i + 1, equipeId: null, isBye: true });
+        byesAssigned++;
+      } else {
+        // Normal match - both slots get teams
+        slots.push({ position: i, equipeId: ordered[teamIndex++], isBye: false });
+        if (teamIndex < ordered.length) {
+          slots.push({ position: i + 1, equipeId: ordered[teamIndex++], isBye: false });
+        } else {
+          // Safety: shouldn't happen
+          slots.push({ position: i + 1, equipeId: null, isBye: true });
+        }
       }
     }
     

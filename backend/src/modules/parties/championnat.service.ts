@@ -70,10 +70,10 @@ export class ChampionnatService {
           orderBy: { numero: 'asc' }
         });
 
-        let terrainIdx = 0;
-
         for (let i = 0; i < poolAssignments.length; i++) {
           const poolTeams = poolAssignments[i];
+          const poolTerrain = terrains[i % terrains.length];
+          
           const poule = await tx.poule.create({
             data: {
               concoursId,
@@ -87,20 +87,18 @@ export class ChampionnatService {
 
           const matches = generateRoundRobin(poolTeams);
           for (const [equipeAId, equipeBId] of matches) {
-            const terrain = terrains[terrainIdx % terrains.length];
             await tx.partie.create({
               data: {
                 concoursId,
                 pouleId: poule.id,
                 equipeAId,
                 equipeBId,
-                terrainId: terrain?.id,
+                terrainId: poolTerrain?.id,
                 type: TypePartie.CHAMPIONNAT_POULE,
                 statut: StatutPartie.A_JOUER,
-                tour: 1 // Phase de poule considérée comme tour 1
+                tour: 1
               }
             });
-            terrainIdx++;
           }
         }
       });
@@ -151,24 +149,44 @@ export class ChampionnatService {
         throw new BadRequestException('Certaines parties de poules ne sont pas encore terminées');
       }
 
-      // Calculer les qualifiés (Top 2 de chaque poule) avec classement global
-      const allRankings: RankingEntry[] = [];
+      // Calculer les qualifiés en séparant gagnants de poule et deuxièmes
+      const poolWinners: RankingEntry[] = [];
+      const poolRunnersUp: RankingEntry[] = [];
       
       for (const poule of concours.poules) {
         const poolRankings = await this.getPoolRankings(concoursId, poule.id);
-        allRankings.push(...poolRankings.slice(0, 2));
+        
+        // Première place = gagnant de poule
+        if (poolRankings.length >= 1) {
+          poolWinners.push(poolRankings[0]);
+        }
+        
+        // Deuxième place = deuxième
+        if (poolRankings.length >= 2) {
+          poolRunnersUp.push(poolRankings[1]);
+        }
       }
 
-      if (allRankings.length < 2) {
-        throw new BadRequestException("Pas assez d'équipes qualifiées pour la phase finale");
-      }
-
-      // Trier globalement par victoires → quotient → points marqués
-      allRankings.sort((a, b) => {
+      // Trier les gagnants par victoires → quotient → points marqués
+      poolWinners.sort((a, b) => {
         if (a.victoires !== b.victoires) return b.victoires - a.victoires;
         if (a.quotient !== b.quotient) return b.quotient - a.quotient;
         return b.pointsMarques - a.pointsMarques;
       });
+
+      // Trier les deuxièmes par victoires → quotient → points marqués
+      poolRunnersUp.sort((a, b) => {
+        if (a.victoires !== b.victoires) return b.victoires - a.victoires;
+        if (a.quotient !== b.quotient) return b.quotient - a.quotient;
+        return b.pointsMarques - a.pointsMarques;
+      });
+
+      // Les gagnants de poule en premier, puis les deuxièmes (priorité pour les byes)
+      const allRankings = [...poolWinners, ...poolRunnersUp];
+
+      if (allRankings.length < 2) {
+        throw new BadRequestException("Pas assez d'équipes qualifiées pour la phase finale");
+      }
 
       const qualifiedEquipeIds = allRankings.map(r => r.equipeId);
 

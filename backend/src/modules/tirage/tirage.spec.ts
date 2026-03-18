@@ -197,7 +197,7 @@ describe('generateBracket', () => {
   });
 
   describe('preserveOrder mode', () => {
-    it('should distribute byes evenly when preserveOrder=true', () => {
+    it('should give byes to top-seeded teams when preserveOrder=true', () => {
       const ids = ['Top1', 'Top2', 'Mid1', 'Mid2', 'Low1'];
       const slots = generateBracket(ids, 'seed', true);
       expect(slots).toHaveLength(8);
@@ -205,21 +205,18 @@ describe('generateBracket', () => {
       const byes = slots.filter((s) => s.isBye);
       expect(byes).toHaveLength(3);
       
-      // With 3 byes in 8 slots: positions 0, 2, 5 (distributed evenly)
-      expect(slots[0].isBye).toBe(true);
-      expect(slots[2].isBye).toBe(true);
+      // Top 3 teams should get byes: (Top1,bye), (Top2,bye), (Top3,bye)
+      // Bracket pairs: (0,1), (2,3), (4,5), (6,7)
+      expect(slots[0].equipeId).toBe('Top1');
+      expect(slots[1].isBye).toBe(true);
+      expect(slots[2].equipeId).toBe('Top2');
+      expect(slots[3].isBye).toBe(true);
+      expect(slots[4].equipeId).toBe('Mid1');
       expect(slots[5].isBye).toBe(true);
       
-      // Teams fill remaining positions in order
-      const teams = slots.filter(s => !s.isBye).map(s => s.equipeId);
-      expect(teams).toEqual(['Top1', 'Top2', 'Mid1', 'Mid2', 'Low1']);
-      
-      // Verify no adjacent byes
-      for (let i = 0; i < slots.length - 1; i++) {
-        if (slots[i].isBye) {
-          expect(slots[i + 1].isBye).toBe(false);
-        }
-      }
+      // Remaining teams play each other
+      expect(slots[6].equipeId).toBe('Mid2');
+      expect(slots[7].equipeId).toBe('Low1');
     });
 
     it('should shuffle teams when preserveOrder=false (default)', () => {

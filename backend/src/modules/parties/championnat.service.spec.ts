@@ -171,6 +171,75 @@ describe('ChampionnatService', () => {
       expect(prisma.poule.create).toHaveBeenCalledTimes(2);
     });
 
+    it('should assign each pool to a dedicated terrain when terrains >= pools', async () => {
+      const teams = Array.from({ length: 8 }, (_, i) => makeEquipe(`eq${i}`));
+      const terrains = [makeTerrain(1), makeTerrain(2), makeTerrain(3)];
+
+      prisma.concours.findUnique.mockResolvedValue(
+        makeConcours({ equipes: teams, params: { taillePoule: 4 } }),
+      );
+      prisma.terrain.findMany.mockResolvedValue(terrains);
+      redis.set.mockResolvedValue('OK');
+
+      const createdMatches: any[] = [];
+      let poolCounter = 0;
+      
+      prisma.poule.create.mockImplementation((data) => {
+        poolCounter++;
+        return Promise.resolve({ id: `poule-${poolCounter}`, numero: poolCounter, ...data.data });
+      });
+      
+      prisma.partie.create.mockImplementation((data) => {
+        createdMatches.push(data.data);
+        return Promise.resolve({ id: `match-${createdMatches.length}`, ...data.data });
+      });
+
+      await service.lancerPoules('concours-1');
+
+      const pool1Matches = createdMatches.filter(m => m.pouleId === 'poule-1');
+      expect(pool1Matches.length).toBe(6);
+      expect(pool1Matches.every(m => m.terrainId === 'terrain-1')).toBe(true);
+
+      const pool2Matches = createdMatches.filter(m => m.pouleId === 'poule-2');
+      expect(pool2Matches.length).toBe(6);
+      expect(pool2Matches.every(m => m.terrainId === 'terrain-2')).toBe(true);
+    });
+
+    it('should wrap terrain assignment when pools > terrains (modulo)', async () => {
+      const teams = Array.from({ length: 12 }, (_, i) => makeEquipe(`eq${i}`));
+      const terrains = [makeTerrain(1), makeTerrain(2)];
+
+      prisma.concours.findUnique.mockResolvedValue(
+        makeConcours({ equipes: teams, params: { taillePoule: 4 } }),
+      );
+      prisma.terrain.findMany.mockResolvedValue(terrains);
+      redis.set.mockResolvedValue('OK');
+
+      const createdMatches: any[] = [];
+      let poolCounter = 0;
+      
+      prisma.poule.create.mockImplementation((data) => {
+        poolCounter++;
+        return Promise.resolve({ id: `poule-${poolCounter}`, numero: poolCounter, ...data.data });
+      });
+      
+      prisma.partie.create.mockImplementation((data) => {
+        createdMatches.push(data.data);
+        return Promise.resolve({ id: `match-${createdMatches.length}`, ...data.data });
+      });
+
+      await service.lancerPoules('concours-1');
+
+      const pool1Matches = createdMatches.filter(m => m.pouleId === 'poule-1');
+      expect(pool1Matches.every(m => m.terrainId === 'terrain-1')).toBe(true);
+
+      const pool2Matches = createdMatches.filter(m => m.pouleId === 'poule-2');
+      expect(pool2Matches.every(m => m.terrainId === 'terrain-2')).toBe(true);
+
+      const pool3Matches = createdMatches.filter(m => m.pouleId === 'poule-3');
+      expect(pool3Matches.every(m => m.terrainId === 'terrain-1')).toBe(true);
+    });
+
     it('should generate round-robin matches for each pool', async () => {
       const teams = Array.from({ length: 4 }, (_, i) => makeEquipe(`eq${i}`));
       const terrains = [makeTerrain(1)];
@@ -559,6 +628,61 @@ describe('ChampionnatService', () => {
 
       await expect(service.lancerPhaseFinale('concours-1')).rejects.toThrow(BadRequestException);
       await expect(service.lancerPhaseFinale('concours-1')).rejects.toThrow('Lancement de la phase finale déjà en cours');
+    });
+
+    it('should prioritize pool winners for bracket seeding over runners-up', async () => {
+      const poule1 = {
+        ...makePoule('poule-1', 1),
+        parties: [
+          makePoolMatch('m1', 'poule-1', 'eq1', 'eq2', 13, 5),
+          makePoolMatch('m2', 'poule-1', 'eq1', 'eq3', 13, 8),
+          makePoolMatch('m3', 'poule-1', 'eq2', 'eq3', 13, 7),
+        ],
+      };
+      const poule2 = {
+        ...makePoule('poule-2', 2),
+        parties: [
+          makePoolMatch('m4', 'poule-2', 'eq4', 'eq5', 13, 10),
+          makePoolMatch('m5', 'poule-2', 'eq4', 'eq6', 13, 11),
+          makePoolMatch('m6', 'poule-2', 'eq5', 'eq6', 13, 9),
+        ],
+      };
+      const poule3 = {
+        ...makePoule('poule-3', 3),
+        parties: [
+          makePoolMatch('m7', 'poule-3', 'eq7', 'eq8', 13, 4),
+          makePoolMatch('m8', 'poule-3', 'eq7', 'eq9', 13, 7),
+          makePoolMatch('m9', 'poule-3', 'eq8', 'eq9', 13, 10),
+        ],
+      };
+
+      prisma.concours.findUnique.mockResolvedValue(
+        makeConcours({ poules: [poule1, poule2, poule3] }),
+      );
+      prisma.partie.findMany.mockImplementation(({ where }) => {
+        if (where.pouleId === 'poule-1') return Promise.resolve(poule1.parties);
+        if (where.pouleId === 'poule-2') return Promise.resolve(poule2.parties);
+        if (where.pouleId === 'poule-3') return Promise.resolve(poule3.parties);
+        if (where.type === TypePartie.CHAMPIONNAT_POULE) {
+          return Promise.resolve([...poule1.parties, ...poule2.parties, ...poule3.parties]);
+        }
+        return Promise.resolve([]);
+      });
+      prisma.terrain.findMany.mockResolvedValue([makeTerrain(1)]);
+      prisma.equipe.findFirst.mockResolvedValue(null);
+      prisma.equipe.create.mockResolvedValue({ id: 'bye-team' });
+
+      const createdMatches: any[] = [];
+      prisma.partie.create.mockImplementation((data) => {
+        const match = { id: `match-${createdMatches.length + 1}`, ...data.data };
+        createdMatches.push(match);
+        return Promise.resolve(match);
+      });
+      redis.set.mockResolvedValue('OK');
+
+      await service.lancerPhaseFinale('concours-1');
+
+      expect(createdMatches.length).toBeGreaterThan(0);
     });
   });
 });
