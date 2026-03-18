@@ -5,6 +5,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { ConcoursService } from './concours.service';
 import { CreateConcoursDto } from './dto/create-concours.dto';
 import { UpdateConcoursDto } from './dto/update-concours.dto';
+import { ExportConcoursDto } from './dto/export-concours.dto';
+import { ImportConcoursDto } from './dto/import-concours.dto';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RolesGuard } from '@/common/guards/roles.guard';
@@ -57,5 +59,20 @@ export class ConcoursController {
   @Post(':id/terminer')
   terminer(@Param('id') id: string, @CurrentUser() user: JwtPayload): Promise<Concours> {
     return this.concoursService.terminer(id, user.sub, user.role);
+  }
+
+  @Get(':id/export')
+  @Roles(Role.SUPER_ADMIN, Role.ORGANISATEUR, Role.ARBITRE)
+  exportConcours(@Param('id') id: string): Promise<ExportConcoursDto> {
+    return this.concoursService.exportConcours(id);
+  }
+
+  @Post('import')
+  @Roles(Role.SUPER_ADMIN, Role.ORGANISATEUR)
+  importConcours(
+    @Body() dto: ImportConcoursDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<Concours> {
+    return this.concoursService.importConcours(dto, user.sub);
   }
 }

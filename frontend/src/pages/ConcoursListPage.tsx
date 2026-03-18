@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Upload } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { concoursApi } from '@/api/concours';
 import { Spinner } from '@/components/common/Spinner';
 import { Button } from '@/components/common/Button';
@@ -14,6 +15,7 @@ const ALL_STATUTS: StatutConcours[] = ['INSCRIPTION', 'EN_COURS', 'TERMINE'];
 
 export default function ConcoursListPage(): JSX.Element {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [filterStatut, setFilterStatut] = useState<StatutConcours | 'ALL'>('ALL');
   const hasRole = useAuthStore((s) => s.hasRole);
@@ -24,6 +26,31 @@ export default function ConcoursListPage(): JSX.Element {
     queryKey: ['concours'],
     queryFn: concoursApi.list,
   });
+
+  const importMutation = useMutation({
+    mutationFn: concoursApi.importJson,
+    onSuccess: (newConcours) => {
+      queryClient.invalidateQueries({ queryKey: ['concours'] });
+      toast.success(`Concours "${newConcours.nom}" importé avec succès`);
+      navigate(`/concours/${newConcours.id}`);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erreur lors de l\'import');
+    },
+  });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      toast.error('Seuls les fichiers JSON sont acceptés');
+      return;
+    }
+
+    importMutation.mutate(file);
+    e.target.value = '';
+  };
 
   const filtered = concours.filter((c) => {
     const matchSearch =
@@ -41,9 +68,24 @@ export default function ConcoursListPage(): JSX.Element {
           <p className="text-dark-50 text-sm mt-1">{concours.length} concours au total</p>
         </div>
         {canCreateTournament && (
-          <Button onClick={() => navigate('/concours/nouveau')}>
-            <Plus size={16} /> Nouveau concours
-          </Button>
+          <>
+            <Button onClick={() => navigate('/concours/nouveau')}>
+              <Plus size={16} /> Nouveau concours
+            </Button>
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleFileSelect}
+                className="hidden"
+                disabled={importMutation.isPending}
+              />
+              <div className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all bg-dark-400 text-gray-100 border border-dark-300 hover:bg-dark-300 hover:border-dark-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                <Upload size={16} />
+                {importMutation.isPending ? 'Import...' : 'Importer'}
+              </div>
+            </label>
+          </>
         )}
       </div>
 

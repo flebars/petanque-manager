@@ -1,5 +1,21 @@
 import { api } from './client';
-import { Concours } from '@/types';
+import { Concours, ExportedTournament } from '@/types';
+
+function readFileAsJson(file: File): Promise<ExportedTournament> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(reader.result as string);
+        resolve(json);
+      } catch (e) {
+        reject(new Error('Fichier JSON invalide'));
+      }
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
 
 export const concoursApi = {
   list: (): Promise<Concours[]> => api.get<Concours[]>('/concours').then((r) => r.data),
@@ -20,4 +36,10 @@ export const concoursApi = {
 
   terminer: (id: string): Promise<Concours> =>
     api.post<Concours>(`/concours/${id}/terminer`).then((r) => r.data),
+
+  exportJson: (id: string): Promise<ExportedTournament> =>
+    api.get<ExportedTournament>(`/concours/${id}/export`).then((r) => r.data),
+
+  importJson: (file: File): Promise<Concours> =>
+    readFileAsJson(file).then((data) => api.post<Concours>('/concours/import', data).then((r) => r.data)),
 };
