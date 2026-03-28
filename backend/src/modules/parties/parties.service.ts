@@ -10,6 +10,7 @@ import { EventsGateway } from '@/modules/gateway/events.gateway';
 import { CoupeService } from './coupe.service';
 import { ChampionnatService } from './championnat.service';
 import { Redis } from 'ioredis';
+import { JwtPayload } from '@/modules/auth/strategies/jwt.strategy';
 
 const DRAW_LOCK_TTL = 30;
 
@@ -122,6 +123,99 @@ export class PartiesService {
       await this.coupeService.progresserMatchBracket(updated);
     } else {
       console.log('[DEBUG] Not progressing - conditions not met');
+    }
+
+    return updated;
+  }
+
+  async modifierScore(id: string, dto: SaisirScoreDto, currentUser: JwtPayload): Promise<Partie> {
+    const partie = await this.findOne(id);
+
+    if (partie.statut !== StatutPartie.TERMINEE && partie.statut !== StatutPartie.FORFAIT) {
+      throw new BadRequestException('Cette partie n\'est pas terminée, impossible de modifier le score');
+    }
+
+    if (partie.equipeAId === partie.equipeBId) {
+      throw new BadRequestException('Les scores BYE ne peuvent pas être modifiés');
+    }
+
+    const concours = await this.prisma.concours.findUnique({
+      where: { id: partie.concoursId },
+    });
+
+    if (concours?.format === FormatConcours.MELEE && partie.tour) {
+      const nextRoundStarted = await this.prisma.partie.findFirst({
+        where: { 
+          concoursId: partie.concoursId, 
+          tour: { gt: partie.tour },
+          statut: { in: [StatutPartie.EN_COURS, StatutPartie.TERMINEE, StatutPartie.FORFAIT] },
+        },
+      });
+      if (nextRoundStarted) {
+        throw new BadRequestException('Le tour suivant a déjà été lancé, impossible de modifier le score');
+      }
+    }
+
+    if ((concours?.format === FormatConcours.COUPE || concours?.format === FormatConcours.CHAMPIONNAT) && partie.bracketRonde) {
+      const nextBracketRoundStarted = await this.prisma.partie.findFirst({
+        where: {
+          concoursId: partie.concoursId,
+          type: partie.type,
+          bracketRonde: { gt: partie.bracketRonde },
+          statut: { in: [StatutPartie.EN_COURS, StatutPartie.TERMINEE, StatutPartie.FORFAIT] },
+        },
+      });
+      if (nextBracketRoundStarted) {
+        throw new BadRequestException('Le round suivant a déjà été lancé, impossible de modifier le score');
+      }
+    }
+
+    const { scoreA, scoreB } = dto;
+    if (scoreA !== 13 && scoreB !== 13) {
+      throw new BadRequestException('Le gagnant doit avoir exactement 13 points');
+    }
+    if (scoreA === 13 && scoreB === 13) {
+      throw new BadRequestException('Les deux équipes ne peuvent pas avoir 13 points');
+    }
+    if (scoreA < 0 || scoreB < 0 || scoreA > 13 || scoreB > 13) {
+      throw new BadRequestException('Score invalide');
+    }
+
+    const oldScoreA = partie.scoreA;
+    const oldScoreB = partie.scoreB;
+
+    const updated = await this.prisma.partie.update({
+      where: { id },
+      data: { scoreA, scoreB },
+    });
+
+    await this.classementService.recalculer(partie.concoursId);
+
+    await this.prisma.auditLog.create({
+      data: {
+        action: 'SCORE_MODIFIE',
+        actorId: currentUser.sub,
+        targetId: partie.id,
+        details: {
+          partieId: partie.id,
+          concoursId: partie.concoursId,
+          ancienScoreA: oldScoreA,
+          ancienScoreB: oldScoreB,
+          nouveauScoreA: scoreA,
+          nouveauScoreB: scoreB,
+          tour: partie.tour,
+          bracketRonde: partie.bracketRonde,
+        },
+      },
+    });
+
+    this.eventsGateway.emitScoreValide(partie.concoursId, updated);
+
+    if ((concours?.format === FormatConcours.COUPE || concours?.format === FormatConcours.CHAMPIONNAT) && 
+        (updated.type === TypePartie.COUPE_PRINCIPALE || 
+         updated.type === TypePartie.COUPE_CONSOLANTE || 
+         updated.type === TypePartie.CHAMPIONNAT_FINALE)) {
+      await this.coupeService.progresserMatchBracket(updated);
     }
 
     return updated;

@@ -85,6 +85,7 @@ export default function ConcoursDetailPage(): JSX.Element {
   const [activeBracketTab, setActiveBracketTab] = useState<BracketTab>('principale');
   const [tourActif, setTourActif] = useState(1);
   const [selectedBracketMatch, setSelectedBracketMatch] = useState<Partie | null>(null);
+  const [bracketEditMode, setBracketEditMode] = useState<'create' | 'edit'>('create');
   const [showEditModal, setShowEditModal] = useState(false);
 
   const user = useAuthStore((s) => s.user);
@@ -239,6 +240,16 @@ export default function ConcoursDetailPage(): JSX.Element {
     },
     onError: () => toast.error('Erreur lors de l\'export'),
   });
+
+  const handleBracketEditClick = (match: Partie): void => {
+    setBracketEditMode('edit');
+    setSelectedBracketMatch(match);
+  };
+
+  const handleBracketMatchClick = (match: Partie): void => {
+    setBracketEditMode('create');
+    setSelectedBracketMatch(match);
+  };
 
   const tours = useMemo(() => {
     const set = new Set(parties.map((p) => p.tour).filter((t): t is number => t !== undefined));
@@ -490,6 +501,7 @@ export default function ConcoursDetailPage(): JSX.Element {
                     parties={parties.filter((p) => p.type === 'CHAMPIONNAT_POULE')}
                     concoursId={id!}
                     readonly={concours.statut === 'TERMINE'}
+                    allParties={parties}
                   />
                 </>
               ) : (
@@ -498,7 +510,9 @@ export default function ConcoursDetailPage(): JSX.Element {
                   parties={parties.filter((p) => p.type === 'CHAMPIONNAT_FINALE')}
                   type="CHAMPIONNAT_FINALE"
                   concoursId={id!}
-                  onMatchClick={(match) => setSelectedBracketMatch(match)}
+                  onMatchClick={handleBracketMatchClick}
+                  allParties={parties}
+                  onEditMatch={handleBracketEditClick}
                 />
               )}
             </div>
@@ -568,7 +582,9 @@ export default function ConcoursDetailPage(): JSX.Element {
                       parties={parties.filter((p) => p.type === 'COUPE_PRINCIPALE')}
                       type="COUPE_PRINCIPALE"
                       concoursId={id!}
-                      onMatchClick={(match) => setSelectedBracketMatch(match)}
+                      onMatchClick={handleBracketMatchClick}
+                      allParties={parties}
+                      onEditMatch={handleBracketEditClick}
                     />
                   )}
 
@@ -579,7 +595,9 @@ export default function ConcoursDetailPage(): JSX.Element {
                           parties={parties.filter((p) => p.type === 'COUPE_CONSOLANTE')}
                           type="COUPE_CONSOLANTE"
                           concoursId={id!}
-                          onMatchClick={(match) => setSelectedBracketMatch(match)}
+                          onMatchClick={handleBracketMatchClick}
+                          allParties={parties}
+                          onEditMatch={handleBracketEditClick}
                         />
                       ) : (
                         <div className="text-center py-12 text-dark-100 bg-dark-400 rounded-lg border border-dashed border-dark-200">
@@ -671,6 +689,7 @@ export default function ConcoursDetailPage(): JSX.Element {
                 concoursId={id!}
                 tour={tourActif}
                 parties={partiesDuTour}
+                allParties={parties}
                 isCurrentTour={isCurrentTour}
                 canLancer={
                   canManageTournament &&
@@ -787,6 +806,7 @@ export default function ConcoursDetailPage(): JSX.Element {
           partie={selectedBracketMatch}
           equipeANom={selectedBracketMatch.equipeA ? nomEquipe(selectedBracketMatch.equipeA) : '—'}
           equipeBNom={selectedBracketMatch.equipeB ? nomEquipe(selectedBracketMatch.equipeB) : '—'}
+          mode={bracketEditMode}
           onSuccess={() => {
             setSelectedBracketMatch(null);
             queryClient.invalidateQueries({ queryKey: ['parties', id] });

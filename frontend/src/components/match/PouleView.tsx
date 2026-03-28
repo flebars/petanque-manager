@@ -11,9 +11,10 @@ interface PouleViewProps {
   parties: Partie[];
   concoursId: string;
   readonly?: boolean;
+  allParties?: Partie[];
 }
 
-export function PouleView({ poules, parties, concoursId, readonly }: PouleViewProps) {
+export function PouleView({ poules, parties, concoursId, readonly, allParties }: PouleViewProps) {
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
       {poules.map((poule) => (
@@ -23,17 +24,19 @@ export function PouleView({ poules, parties, concoursId, readonly }: PouleViewPr
           parties={parties.filter((p) => p.pouleId === poule.id)}
           concoursId={concoursId}
           readonly={readonly}
+          allParties={allParties}
         />
       ))}
     </div>
   );
 }
 
-function PouleCard({ poule, parties, concoursId, readonly }: { 
+function PouleCard({ poule, parties, concoursId, readonly, allParties }: { 
   poule: Poule; 
   parties: Partie[]; 
   concoursId: string;
   readonly?: boolean;
+  allParties?: Partie[];
 }) {
   const sortedParties = useMemo(() => {
     return [...parties].sort((a, b) => {
@@ -179,6 +182,7 @@ function PouleCard({ poule, parties, concoursId, readonly }: {
                 concoursId={concoursId}
                 readonly={readonly}
                 compact
+                allParties={allParties}
               />
             ))}
           </div>

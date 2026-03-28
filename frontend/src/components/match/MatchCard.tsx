@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { MapPin, Flag, AlertTriangle, Play, CheckCircle } from 'lucide-react';
+import { MapPin, Flag, AlertTriangle, Play, CheckCircle, Edit } from 'lucide-react';
 import type { Partie } from '@/types';
 import { partiesApi } from '@/api/parties';
 import { Badge } from '@/components/common/Badge';
@@ -17,6 +17,7 @@ interface MatchCardProps {
   concoursId: string;
   readonly?: boolean;
   compact?: boolean;
+  allParties?: Partie[];
 }
 
 const STATUT_BADGE_VARIANT = {
@@ -32,9 +33,11 @@ export function MatchCard({
   partie, 
   concoursId, 
   readonly = false,
-  compact = false
+  compact = false,
+  allParties = [],
 }: MatchCardProps): JSX.Element {
   const [showScore, setShowScore] = useState(false);
+  const [showEditScore, setShowEditScore] = useState(false);
   const [showLitige, setShowLitige] = useState(false);
   const [litigeMode, setLitigeMode] = useState<'signal' | 'resoudre'>('signal');
   const queryClient = useQueryClient();
@@ -69,6 +72,29 @@ export function MatchCard({
   const bWon = hasScore && (partie.scoreB ?? 0) === 13;
   const isActive = partie.statut === 'EN_COURS';
   const isDone = partie.statut === 'TERMINEE' || partie.statut === 'FORFAIT';
+
+  const canEditScore = useMemo(() => {
+    if (readonly || !isDone) return false;
+    if (isByeTeam(equipeA) || isByeTeam(equipeB)) return false;
+    if (!allParties || allParties.length === 0) return false;
+
+    if (partie.tour) {
+      const hasNextTour = allParties.some((p) => p.tour && p.tour > (partie.tour ?? 0));
+      return !hasNextTour;
+    }
+
+    if (partie.bracketRonde) {
+      const hasNextBracketRound = allParties.some(
+        (p) => 
+          p.type === partie.type && 
+          p.bracketRonde && 
+          p.bracketRonde > (partie.bracketRonde ?? 0)
+      );
+      return !hasNextBracketRound;
+    }
+
+    return false;
+  }, [readonly, isDone, equipeA, equipeB, allParties, partie.tour, partie.bracketRonde, partie.type]);
 
   return (
     <>
@@ -226,6 +252,18 @@ export function MatchCard({
             )}
           </div>
         )}
+
+        {!readonly && isDone && canEditScore && (
+          <div className="flex flex-wrap gap-2 pt-3 mt-3 border-t border-dark-300">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowEditScore(true)}
+            >
+              <Edit size={13} /> Modifier le score
+            </Button>
+          </div>
+        )}
       </div>
 
       <ScoreForm
@@ -235,6 +273,16 @@ export function MatchCard({
         equipeANom={nomA}
         equipeBNom={nomB}
         onSuccess={() => { invalidate(); setShowScore(false); }}
+      />
+
+      <ScoreForm
+        mode="edit"
+        open={showEditScore}
+        onClose={() => setShowEditScore(false)}
+        partie={partie}
+        equipeANom={nomA}
+        equipeBNom={nomB}
+        onSuccess={() => { invalidate(); setShowEditScore(false); }}
       />
 
       <LitigeForm

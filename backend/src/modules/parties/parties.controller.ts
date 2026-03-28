@@ -51,6 +51,16 @@ export class PartiesController {
     return this.partiesService.saisirScore(id, dto);
   }
 
+  @Patch(':id/modifier-score')
+  @Roles(Role.SUPER_ADMIN, Role.ORGANISATEUR, Role.ARBITRE)
+  modifierScore(
+    @Param('id') id: string,
+    @Body() dto: SaisirScoreDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<Partie> {
+    return this.partiesService.modifierScore(id, dto, user);
+  }
+
   @Post(':id/forfait/:equipeId')
   @Roles(Role.SUPER_ADMIN, Role.ORGANISATEUR, Role.ARBITRE)
   forfaitAvantMatch(

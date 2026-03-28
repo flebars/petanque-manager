@@ -11,6 +11,7 @@ interface TourPanelProps {
   concoursId: string;
   tour: number;
   parties: Partie[];
+  allParties?: Partie[];
   isCurrentTour?: boolean;
   canLancer: boolean;
   canManageMatches?: boolean;
@@ -21,6 +22,7 @@ export function TourPanel({
   concoursId,
   tour,
   parties,
+  allParties,
   canLancer,
   canManageMatches = true,
   readonly = false,
@@ -153,6 +155,7 @@ export function TourPanel({
                       partie={partie}
                       concoursId={concoursId}
                       readonly={readonly || !canManageMatches}
+                      allParties={allParties}
                     />
                   ))}
                 </div>

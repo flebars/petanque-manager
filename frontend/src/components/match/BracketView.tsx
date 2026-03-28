@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { MapPin, ChevronLeft, ChevronRight, Play, FileDown } from 'lucide-react';
+import { MapPin, ChevronLeft, ChevronRight, Play, FileDown, Edit } from 'lucide-react';
 import { Partie } from '@/types';
 import { nomEquipe, isTbdTeam, isByeTeam } from '@/lib/utils';
 import { Badge } from '@/components/common/Badge';
@@ -15,6 +15,8 @@ interface BracketViewProps {
   type: 'COUPE_PRINCIPALE' | 'COUPE_CONSOLANTE' | 'CHAMPIONNAT_FINALE';
   concoursId: string;
   onMatchClick?: (match: Partie) => void;
+  allParties?: Partie[];
+  onEditMatch?: (match: Partie) => void;
 }
 
 interface PlaceholderMatch {
@@ -72,7 +74,7 @@ function calculateMaxBracketRonde(firstRoundMatchCount: number, minRound: number
   return minRound + rounds;
 }
 
-export function BracketView({ parties, type, concoursId, onMatchClick }: BracketViewProps) {
+export function BracketView({ parties, type, concoursId, onMatchClick, allParties, onEditMatch }: BracketViewProps) {
   const { rounds, allRoundKeys, minRound, maxRound } = useMemo(() => {
     const grouped: GroupedRounds = {};
     
@@ -251,6 +253,8 @@ export function BracketView({ parties, type, concoursId, onMatchClick }: Bracket
                     match={match}
                     concoursId={concoursId}
                     isFinale={match.bracketRonde === 6 && (match.bracketPos === 0 || match.bracketPos === 1)} 
+                    allParties={allParties}
+                    onEditMatch={onEditMatch}
                   />
                 )}
               </div>
@@ -343,9 +347,11 @@ interface BracketMatchCardProps {
   concoursId: string;
   isFinale?: boolean;
   preview?: boolean;
+  allParties?: Partie[];
+  onEditMatch?: (match: Partie) => void;
 }
 
-function BracketMatchCard({ match, concoursId, isFinale = false, preview = false }: BracketMatchCardProps) {
+function BracketMatchCard({ match, concoursId, isFinale = false, preview = false, allParties, onEditMatch }: BracketMatchCardProps) {
   const queryClient = useQueryClient();
   const { equipeA, equipeB, scoreA, scoreB, statut, terrain } = match;
 
@@ -358,13 +364,10 @@ function BracketMatchCard({ match, concoursId, isFinale = false, preview = false
     onError: () => toast.error('Impossible de démarrer la partie'),
   });
 
-  // Check if it's a bye match (equipeB is the __BYE__ placeholder)
   const isBye = isByeTeam(equipeB) || (equipeA && isByeTeam(equipeA));
   
-  // Check if both teams are TBD (waiting for both teams)
   const bothTbd = isTbdTeam(equipeA) && isTbdTeam(equipeB);
   
-  // Placeholder means waiting for opponent (one real team, one TBD)
   const isPlaceholder = !isBye && !bothTbd && 
     (isTbdTeam(equipeA) || isTbdTeam(equipeB)) && 
     statut === 'A_MONTER';
@@ -384,6 +387,20 @@ function BracketMatchCard({ match, concoursId, isFinale = false, preview = false
   const hasTeamA = equipeA && equipeA.id && !isTbdTeam(equipeA);
   const hasTeamB = equipeB && equipeB.id && !isTbdTeam(equipeB);
   const hasBothRealTeams = hasTeamA && hasTeamB && !isBye;
+
+  const canEditScore = useMemo(() => {
+    if (!allParties || !onEditMatch) return false;
+    if (statut !== 'TERMINEE' && statut !== 'FORFAIT') return false;
+    if (match.equipeAId === match.equipeBId) return false;
+    
+    const nextRoundHasStarted = allParties.some(p => 
+      p.type === match.type && 
+      (p.bracketRonde ?? 0) > (match.bracketRonde ?? 0) &&
+      (p.statut === 'EN_COURS' || p.statut === 'TERMINEE' || p.statut === 'FORFAIT')
+    );
+    
+    return !nextRoundHasStarted;
+  }, [allParties, onEditMatch, statut, match]);
 
   return (
     <div className="space-y-1">
@@ -477,6 +494,18 @@ function BracketMatchCard({ match, concoursId, isFinale = false, preview = false
             loading={demarrerMutation.isPending}
           >
             <Play size={13} /> Démarrer
+          </Button>
+        </div>
+      )}
+      {!preview && canEditScore && hasBothRealTeams && (
+        <div className="mt-2 pt-2 border-t border-dark-300" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="w-full"
+            onClick={() => onEditMatch?.(match)}
+          >
+            <Edit size={13} /> Modifier le score
           </Button>
         </div>
       )}

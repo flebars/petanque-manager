@@ -33,6 +33,7 @@ interface ScoreFormProps {
   equipeANom: string;
   equipeBNom: string;
   resoudre?: boolean;
+  mode?: 'create' | 'edit';
   onSuccess: () => void;
 }
 
@@ -43,6 +44,7 @@ export function ScoreForm({
   equipeANom,
   equipeBNom,
   resoudre = false,
+  mode = 'create',
   onSuccess,
 }: ScoreFormProps): JSX.Element {
   const {
@@ -57,8 +59,14 @@ export function ScoreForm({
   });
 
   useEffect(() => {
-    if (open) reset({ scoreA: undefined, scoreB: undefined });
-  }, [open, reset]);
+    if (open) {
+      if (mode === 'edit' && partie.scoreA !== null && partie.scoreB !== null) {
+        reset({ scoreA: partie.scoreA, scoreB: partie.scoreB });
+      } else {
+        reset({ scoreA: undefined, scoreB: undefined });
+      }
+    }
+  }, [open, reset, mode, partie.scoreA, partie.scoreB]);
 
   const scoreA = watch('scoreA');
   const scoreB = watch('scoreB');
@@ -69,9 +77,11 @@ export function ScoreForm({
     mutationFn: (values: FormValues) =>
       resoudre
         ? partiesApi.resoudreLitige(partie.id, values.scoreA, values.scoreB)
-        : partiesApi.saisirScore(partie.id, values.scoreA, values.scoreB),
+        : mode === 'edit'
+          ? partiesApi.modifierScore(partie.id, values.scoreA, values.scoreB)
+          : partiesApi.saisirScore(partie.id, values.scoreA, values.scoreB),
     onSuccess: () => {
-      toast.success('Score enregistré');
+      toast.success(mode === 'edit' ? 'Score modifié' : 'Score enregistré');
       onSuccess();
     },
     onError: () => toast.error("Erreur lors de l'enregistrement du score"),
@@ -85,7 +95,7 @@ export function ScoreForm({
     <Modal
       open={open}
       onClose={onClose}
-      title={resoudre ? 'Résoudre le litige — Score final' : 'Saisir le score'}
+      title={resoudre ? 'Résoudre le litige — Score final' : mode === 'edit' ? 'Modifier le score' : 'Saisir le score'}
       size="sm"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">

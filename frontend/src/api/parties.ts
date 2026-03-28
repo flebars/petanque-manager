@@ -13,6 +13,9 @@ export const partiesApi = {
   saisirScore: (id: string, scoreA: number, scoreB: number): Promise<Partie> =>
     api.patch<Partie>(`/parties/${id}/score`, { scoreA, scoreB }).then((r) => r.data),
 
+  modifierScore: (id: string, scoreA: number, scoreB: number): Promise<Partie> =>
+    api.patch<Partie>(`/parties/${id}/modifier-score`, { scoreA, scoreB }).then((r) => r.data),
+
   forfaitAvantMatch: (id: string, equipeId: string): Promise<Partie> =>
     api.post<Partie>(`/parties/${id}/forfait/${equipeId}`).then((r) => r.data),
 
